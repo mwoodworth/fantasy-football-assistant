@@ -13,11 +13,13 @@ from .ml_pipeline import MLPipeline
 from .insights_engine import InsightsEngine
 from .sentiment_analyzer import SentimentAnalyzer
 from .recommendation_engine import RecommendationEngine
+from .weekly_report_generator import WeeklyReportGenerator
 
 __all__ = [
     "ClaudeAIClient",
     "MLPipeline", 
     "InsightsEngine",
     "SentimentAnalyzer",
-    "RecommendationEngine"
+    "RecommendationEngine",
+    "WeeklyReportGenerator"
 ]

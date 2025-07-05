@@ -21,6 +21,7 @@ from ..services.ai.ml_pipeline import ml_pipeline
 from ..services.ai.insights_engine import insights_engine
 from ..services.ai.sentiment_analyzer import sentiment_analyzer
 from ..services.ai.recommendation_engine import recommendation_engine
+from ..services.ai.weekly_report_generator import weekly_report_generator
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ class RecommendationRequest(BaseModel):
 class QuickRecommendationRequest(BaseModel):
     request_type: str = Field(..., description="Type of recommendation (start_sit, waiver_wire, trade_opportunity)")
     context: Dict[str, Any] = Field(..., description="Context for the recommendation")
+
+class WeeklyReportRequest(BaseModel):
+    team_context: Dict[str, Any] = Field(..., description="Current team roster and situation")
+    league_context: Dict[str, Any] = Field(..., description="League settings and context")
+    week: int = Field(..., ge=1, le=18, description="NFL week number")
+    include_analysis_details: bool = Field(True, description="Include detailed player analysis")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -919,6 +926,218 @@ async def get_recommendation_types(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get recommendation types: {str(e)}"
+        )
+
+
+@router.post("/reports/weekly")
+async def generate_weekly_report(
+    report_request: WeeklyReportRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate comprehensive AI-powered weekly report for fantasy team
+    
+    Provides complete weekly analysis including:
+    - Detailed player analysis with ML predictions and sentiment
+    - Optimized lineup recommendations with matchup analysis
+    - Strategic insights and actionable recommendations
+    - Performance tracking and season trajectory analysis
+    - Opponent analysis and league trends
+    - Executive summary with key insights
+    """
+    try:
+        logger.info(f"Weekly report request for user {current_user.id}, week {report_request.week}")
+        
+        # Generate comprehensive weekly report
+        team_id = report_request.team_context.get("team_id", f"user_{current_user.id}")
+        
+        weekly_report = await weekly_report_generator.generate_weekly_report(
+            team_id=team_id,
+            user_id=current_user.id,
+            week=report_request.week,
+            team_context=report_request.team_context,
+            league_context=report_request.league_context,
+            include_analysis_details=report_request.include_analysis_details
+        )
+        
+        # Convert to JSON-serializable format
+        def serialize_player_analysis(player: Any) -> Dict[str, Any]:
+            return {
+                "player_id": player.player_id,
+                "player_name": player.player_name,
+                "position": player.position,
+                "team": player.team,
+                "projected_points": player.projected_points,
+                "projection_range": player.projection_range,
+                "confidence": round(player.confidence, 3),
+                "start_sit_recommendation": player.start_sit_recommendation,
+                "reasoning": player.reasoning,
+                "risk_factors": player.risk_factors,
+                "upside_factors": player.upside_factors,
+                "matchup": {
+                    "opponent": player.matchup.opponent,
+                    "matchup_rating": player.matchup.matchup_rating,
+                    "matchup_score": player.matchup.matchup_score,
+                    "key_factors": player.matchup.key_factors,
+                    "start_recommendation": player.matchup.start_recommendation
+                },
+                "sentiment": {
+                    "overall_sentiment": player.sentiment_analysis.overall_sentiment.value,
+                    "sentiment_score": player.sentiment_analysis.sentiment_score,
+                    "fantasy_impact": player.sentiment_analysis.fantasy_impact.value,
+                    "recommendation": player.sentiment_analysis.recommendation,
+                    "confidence": player.sentiment_analysis.confidence
+                } if hasattr(player.sentiment_analysis, 'overall_sentiment') else None,
+                "ml_predictions": player.ml_predictions
+            }
+        
+        report_dict = {
+            "team_id": weekly_report.team_id,
+            "user_id": weekly_report.user_id,
+            "week": weekly_report.week,
+            "generated_at": weekly_report.generated_at.isoformat(),
+            
+            # Executive summary
+            "executive_summary": weekly_report.executive_summary,
+            "key_insights": weekly_report.key_insights,
+            "week_outlook": weekly_report.week_outlook,
+            
+            # Team metrics
+            "lineup_score": weekly_report.lineup_score,
+            "projected_total": weekly_report.projected_total,
+            "confidence_level": weekly_report.confidence_level,
+            "risk_assessment": weekly_report.risk_assessment,
+            
+            # Player analysis
+            "starting_lineup": [serialize_player_analysis(p) for p in weekly_report.starting_lineup],
+            "bench_considerations": [serialize_player_analysis(p) for p in weekly_report.bench_considerations] if report_request.include_analysis_details else [],
+            
+            # Strategic elements
+            "recommendations": weekly_report.recommendations,
+            "waiver_targets": weekly_report.waiver_targets,
+            "trade_considerations": weekly_report.trade_considerations,
+            
+            # Market intelligence
+            "opponent_analysis": weekly_report.opponent_analysis,
+            "league_trends": weekly_report.league_trends,
+            
+            # Performance tracking
+            "last_week_recap": weekly_report.last_week_recap,
+            "season_trajectory": weekly_report.season_trajectory
+        }
+        
+        return {
+            "success": True,
+            "data": report_dict,
+            "meta": {
+                "report_type": "weekly_comprehensive",
+                "analysis_depth": "detailed" if report_request.include_analysis_details else "summary",
+                "starting_lineup_count": len(weekly_report.starting_lineup),
+                "total_recommendations": len(weekly_report.recommendations),
+                "confidence_level": weekly_report.confidence_level,
+                "lineup_score": weekly_report.lineup_score,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Weekly report generation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate weekly report: {str(e)}"
+        )
+
+
+@router.get("/reports/weekly/template")
+async def get_weekly_report_template(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get template structure for weekly report request
+    
+    Returns the expected structure for team_context and league_context
+    to help users format their weekly report requests properly.
+    """
+    try:
+        template = {
+            "team_context": {
+                "team_id": "unique_team_identifier",
+                "roster": [
+                    {
+                        "id": "player_id",
+                        "name": "Player Name",
+                        "position": "QB|RB|WR|TE|K|DST",
+                        "team": "NFL_TEAM",
+                        "projected_points": 15.5,
+                        "status": "active|injured|bye",
+                        "ownership_percentage": 95.2
+                    }
+                ],
+                "record": {
+                    "wins": 7,
+                    "losses": 5,
+                    "ties": 0
+                },
+                "current_standing": 4,
+                "playoff_position": "in_hunt"
+            },
+            "league_context": {
+                "league_id": "unique_league_identifier",
+                "scoring_system": "ppr|half_ppr|standard",
+                "league_size": 12,
+                "playoff_spots": 6,
+                "trade_deadline": "2024-11-19",
+                "current_week": 12,
+                "roster_positions": {
+                    "QB": 1,
+                    "RB": 2,
+                    "WR": 2,
+                    "TE": 1,
+                    "FLEX": 1,
+                    "K": 1,
+                    "DST": 1,
+                    "BENCH": 6
+                }
+            },
+            "optional_preferences": {
+                "risk_tolerance": "conservative|balanced|aggressive",
+                "analysis_focus": "projections|matchups|sentiment|all",
+                "include_bench_analysis": True,
+                "include_waiver_suggestions": True,
+                "include_trade_analysis": True
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "template": template,
+                "description": "Use this structure to format your weekly report request",
+                "required_fields": [
+                    "team_context.roster",
+                    "league_context.scoring_system",
+                    "week"
+                ],
+                "optional_fields": [
+                    "team_context.record",
+                    "league_context.roster_positions",
+                    "include_analysis_details"
+                ]
+            },
+            "meta": {
+                "template_version": "1.0",
+                "last_updated": datetime.now().isoformat(),
+                "requested_by": current_user.id
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get weekly report template error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get weekly report template: {str(e)}"
         )
 
 
