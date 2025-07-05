@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     espn_api_key: str = ""
     
+    # ESPN Service Integration (Node.js microservice)
+    espn_service_url: str = "http://localhost:3001"
+    espn_service_api_key: str = ""
+    
     # Server settings
     host: str = "0.0.0.0"
     port: int = 6001
