@@ -16,6 +16,9 @@ import logging
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
+from .api.auth import router as auth_router
+from .api.players import router as players_router
+from .api.fantasy import router as fantasy_router
 
 # Configure logging
 logging.basicConfig(
@@ -54,6 +57,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include API routers
+app.include_router(auth_router, prefix="/api")
+app.include_router(players_router, prefix="/api")
+app.include_router(fantasy_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"
