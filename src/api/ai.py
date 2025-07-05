@@ -19,6 +19,8 @@ from ..services.ai import ClaudeAIClient, MLPipeline, InsightsEngine
 from ..services.ai.claude_client import ai_client
 from ..services.ai.ml_pipeline import ml_pipeline
 from ..services.ai.insights_engine import insights_engine
+from ..services.ai.sentiment_analyzer import sentiment_analyzer
+from ..services.ai.recommendation_engine import recommendation_engine
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,24 @@ class BreakoutCandidatesRequest(BaseModel):
     position: Optional[str] = Field(None, description="Filter by position")
     min_probability: float = Field(0.6, ge=0.0, le=1.0, description="Minimum breakout probability")
     limit: int = Field(10, ge=1, le=50, description="Maximum number of candidates")
+
+class SentimentAnalysisRequest(BaseModel):
+    player_id: int = Field(..., description="Player ID to analyze")
+    player_name: str = Field(..., description="Player name for news search")
+    time_range_hours: int = Field(48, ge=1, le=168, description="Hours to look back for news")
+
+class LeagueSentimentRequest(BaseModel):
+    player_ids: List[int] = Field(..., min_items=1, max_items=50, description="List of player IDs to analyze")
+
+class RecommendationRequest(BaseModel):
+    team_context: Dict[str, Any] = Field(..., description="Current team roster and situation")
+    league_context: Dict[str, Any] = Field(..., description="League settings and context")
+    current_week: int = Field(..., ge=1, le=18, description="Current NFL week")
+    preferences: Optional[Dict[str, Any]] = Field(None, description="User preferences (risk tolerance, etc.)")
+
+class QuickRecommendationRequest(BaseModel):
+    request_type: str = Field(..., description="Type of recommendation (start_sit, waiver_wire, trade_opportunity)")
+    context: Dict[str, Any] = Field(..., description="Context for the recommendation")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -463,6 +483,442 @@ async def clear_conversation(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to clear conversation: {str(e)}"
+        )
+
+
+@router.post("/sentiment/analyze")
+async def analyze_player_sentiment(
+    sentiment_request: SentimentAnalysisRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Analyze sentiment for a specific player from recent news
+    
+    Provides comprehensive sentiment analysis including:
+    - Overall sentiment classification and score
+    - Fantasy football impact assessment
+    - Key themes and news summary
+    - Actionable recommendations
+    - Confidence metrics
+    """
+    try:
+        logger.info(f"Sentiment analysis request for player {sentiment_request.player_id} by user {current_user.id}")
+        
+        # Get sentiment analysis
+        analysis = await sentiment_analyzer.analyze_player_sentiment(
+            player_id=sentiment_request.player_id,
+            player_name=sentiment_request.player_name,
+            time_range_hours=sentiment_request.time_range_hours
+        )
+        
+        # Convert to JSON-serializable format
+        analysis_dict = {
+            "player_id": analysis.player_id,
+            "player_name": analysis.player_name,
+            "overall_sentiment": analysis.overall_sentiment.value,
+            "sentiment_score": analysis.sentiment_score,
+            "fantasy_impact": analysis.fantasy_impact.value,
+            "impact_score": analysis.impact_score,
+            "key_themes": analysis.key_themes,
+            "recommendation": analysis.recommendation,
+            "confidence": analysis.confidence,
+            "last_updated": analysis.last_updated.isoformat(),
+            "news_summary": {
+                "total_articles": len(analysis.news_articles),
+                "recent_articles": len([a for a in analysis.news_articles 
+                                     if (datetime.now() - a.published_at).total_seconds() / 3600 < 24]),
+                "sources": list(set(a.source for a in analysis.news_articles)),
+                "latest_news": analysis.news_articles[0].title if analysis.news_articles else None
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": analysis_dict,
+            "meta": {
+                "requested_by": current_user.id,
+                "analysis_type": "sentiment_analysis",
+                "time_range_hours": sentiment_request.time_range_hours,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Sentiment analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze player sentiment: {str(e)}"
+        )
+
+
+@router.post("/sentiment/league-summary")
+async def get_league_sentiment_summary(
+    league_request: LeagueSentimentRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get sentiment summary for multiple players in a league context
+    
+    Provides:
+    - Overall market sentiment trends
+    - Top positive and negative sentiment players
+    - League-wide news themes
+    - Comparative sentiment analysis
+    """
+    try:
+        logger.info(f"League sentiment analysis for {len(league_request.player_ids)} players by user {current_user.id}")
+        
+        # Get league sentiment summary
+        summary = await sentiment_analyzer.get_league_sentiment_summary(league_request.player_ids)
+        
+        return {
+            "success": True,
+            "data": {
+                "league_sentiment": summary,
+                "player_count": len(league_request.player_ids),
+                "analysis_summary": {
+                    "overall_sentiment": summary.get("overall_market_sentiment", 0.0),
+                    "positive_players": summary.get("positive_sentiment", 0),
+                    "negative_players": summary.get("negative_sentiment", 0),
+                    "neutral_players": summary.get("total_players", 0) - 
+                                     summary.get("positive_sentiment", 0) - 
+                                     summary.get("negative_sentiment", 0)
+                }
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "analysis_type": "league_sentiment_summary",
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"League sentiment analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze league sentiment: {str(e)}"
+        )
+
+
+@router.get("/sentiment/trending")
+async def get_trending_sentiment(
+    hours: int = Query(24, ge=1, le=168, description="Hours to look back"),
+    limit: int = Query(10, ge=1, le=50, description="Number of trending players"),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get players with the most significant sentiment changes
+    
+    Identifies players with:
+    - Major positive news (opportunities, health updates)
+    - Major negative news (injuries, role changes)
+    - Trending stories and breaking news
+    """
+    try:
+        logger.info(f"Trending sentiment analysis for last {hours} hours by user {current_user.id}")
+        
+        # In a real implementation, this would:
+        # 1. Query database for all active players
+        # 2. Analyze recent sentiment changes
+        # 3. Identify biggest sentiment shifts
+        # 4. Return trending players with context
+        
+        # Mock trending data for demonstration
+        trending_data = {
+            "positive_trending": [
+                {
+                    "player_id": 1001,
+                    "player_name": "Josh Allen",
+                    "sentiment_change": 0.6,
+                    "reason": "Cleared from injury report, full practice participation",
+                    "fantasy_impact": "major_positive"
+                },
+                {
+                    "player_id": 1002,
+                    "player_name": "Christian McCaffrey",
+                    "sentiment_change": 0.4,
+                    "reason": "Coach confirms lead role, increased red zone usage",
+                    "fantasy_impact": "minor_positive"
+                }
+            ],
+            "negative_trending": [
+                {
+                    "player_id": 2001,
+                    "player_name": "Ja'Marr Chase",
+                    "sentiment_change": -0.7,
+                    "reason": "Listed as questionable with hip injury",
+                    "fantasy_impact": "major_negative"
+                },
+                {
+                    "player_id": 2002,
+                    "player_name": "Derrick Henry",
+                    "sentiment_change": -0.3,
+                    "reason": "Reduced practice participation, rest concerns",
+                    "fantasy_impact": "minor_negative"
+                }
+            ],
+            "breaking_news": [
+                {
+                    "player_id": 3001,
+                    "player_name": "Travis Kelce",
+                    "news": "Ruled out for Sunday's game with ankle injury",
+                    "impact": "major_negative",
+                    "published_minutes_ago": 15
+                }
+            ]
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "trending_sentiment": trending_data,
+                "time_range_hours": hours,
+                "market_summary": {
+                    "overall_trend": "mixed",
+                    "major_movers": len(trending_data["positive_trending"]) + len(trending_data["negative_trending"]),
+                    "breaking_news_count": len(trending_data["breaking_news"])
+                }
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "analysis_type": "trending_sentiment",
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Trending sentiment analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get trending sentiment: {str(e)}"
+        )
+
+
+@router.post("/recommendations/comprehensive")
+async def get_comprehensive_recommendations(
+    rec_request: RecommendationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Generate comprehensive AI-powered recommendations for fantasy team
+    
+    Provides complete recommendation suite including:
+    - Lineup optimization suggestions
+    - Waiver wire targets with analysis
+    - Trade opportunity identification
+    - Season-long strategic guidance
+    - Prioritized action items
+    """
+    try:
+        logger.info(f"Comprehensive recommendations request for user {current_user.id}, week {rec_request.current_week}")
+        
+        # Generate comprehensive recommendations
+        recommendations_suite = await recommendation_engine.generate_comprehensive_recommendations(
+            user_id=current_user.id,
+            team_context=rec_request.team_context,
+            league_context=rec_request.league_context,
+            current_week=rec_request.current_week,
+            preferences=rec_request.preferences
+        )
+        
+        # Convert to JSON-serializable format
+        suite_dict = {
+            "user_id": recommendations_suite.user_id,
+            "team_id": recommendations_suite.team_id,
+            "overall_strategy": recommendations_suite.overall_strategy,
+            "key_priorities": recommendations_suite.key_priorities,
+            "season_outlook": recommendations_suite.season_outlook,
+            "generated_at": recommendations_suite.generated_at.isoformat(),
+            "valid_until": recommendations_suite.valid_until.isoformat(),
+            "recommendations": []
+        }
+        
+        # Convert recommendations
+        for rec in recommendations_suite.recommendations:
+            rec_dict = {
+                "id": rec.id,
+                "type": rec.type.value,
+                "title": rec.title,
+                "description": rec.description,
+                "action": rec.action,
+                "reasoning": rec.reasoning,
+                "confidence": rec.confidence.value,
+                "confidence_score": rec.confidence_score,
+                "priority": rec.priority,
+                "expected_impact": rec.expected_impact,
+                "alternatives": rec.alternatives,
+                "risk_factors": rec.risk_factors,
+                "created_at": rec.created_at.isoformat(),
+                "expires_at": rec.expires_at.isoformat() if rec.expires_at else None
+            }
+            suite_dict["recommendations"].append(rec_dict)
+        
+        return {
+            "success": True,
+            "data": suite_dict,
+            "meta": {
+                "total_recommendations": len(suite_dict["recommendations"]),
+                "high_priority_count": len([r for r in suite_dict["recommendations"] if r["priority"] >= 8]),
+                "recommendation_types": list(set(r["type"] for r in suite_dict["recommendations"])),
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Comprehensive recommendations error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate comprehensive recommendations: {str(e)}"
+        )
+
+
+@router.post("/recommendations/quick")
+async def get_quick_recommendation(
+    quick_request: QuickRecommendationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get quick AI recommendation for specific fantasy decision
+    
+    Provides fast, targeted recommendations for:
+    - Start/sit decisions
+    - Waiver wire pickups
+    - Trade opportunities
+    - Draft picks
+    """
+    try:
+        logger.info(f"Quick recommendation request: {quick_request.request_type} by user {current_user.id}")
+        
+        # Map request type to enum
+        from ..services.ai.recommendation_engine import RecommendationType
+        type_mapping = {
+            "start_sit": RecommendationType.START_SIT,
+            "waiver_wire": RecommendationType.WAIVER_WIRE,
+            "trade_opportunity": RecommendationType.TRADE_OPPORTUNITY,
+            "draft_strategy": RecommendationType.DRAFT_STRATEGY
+        }
+        
+        recommendation_type = type_mapping.get(quick_request.request_type)
+        if not recommendation_type:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid recommendation type: {quick_request.request_type}"
+            )
+        
+        # Generate quick recommendations
+        recommendations = await recommendation_engine.get_quick_recommendations(
+            user_id=current_user.id,
+            request_type=recommendation_type,
+            context=quick_request.context
+        )
+        
+        # Convert to JSON format
+        recommendations_data = []
+        for rec in recommendations:
+            rec_data = {
+                "id": rec.id,
+                "type": rec.type.value,
+                "title": rec.title,
+                "description": rec.description,
+                "action": rec.action,
+                "reasoning": rec.reasoning,
+                "confidence": rec.confidence.value,
+                "confidence_score": rec.confidence_score,
+                "priority": rec.priority,
+                "expected_impact": rec.expected_impact,
+                "alternatives": rec.alternatives,
+                "risk_factors": rec.risk_factors,
+                "created_at": rec.created_at.isoformat()
+            }
+            recommendations_data.append(rec_data)
+        
+        return {
+            "success": True,
+            "data": {
+                "recommendations": recommendations_data,
+                "request_type": quick_request.request_type,
+                "context": quick_request.context
+            },
+            "meta": {
+                "recommendation_count": len(recommendations_data),
+                "request_type": quick_request.request_type,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Quick recommendation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate quick recommendation: {str(e)}"
+        )
+
+
+@router.get("/recommendations/types")
+async def get_recommendation_types(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get available recommendation types and their descriptions
+    
+    Returns all available recommendation types that can be requested
+    from the AI recommendation engine.
+    """
+    try:
+        from ..services.ai.recommendation_engine import RecommendationType
+        
+        recommendation_types = {
+            "lineup_optimization": {
+                "name": "Lineup Optimization",
+                "description": "Optimize weekly lineup with start/sit recommendations",
+                "use_case": "Weekly lineup decisions and player comparisons"
+            },
+            "waiver_wire": {
+                "name": "Waiver Wire Targets",
+                "description": "Identify best available players to add",
+                "use_case": "Finding sleepers and addressing roster needs"
+            },
+            "trade_opportunity": {
+                "name": "Trade Opportunities",
+                "description": "Find beneficial trade partners and proposals",
+                "use_case": "Improving roster through strategic trades"
+            },
+            "draft_strategy": {
+                "name": "Draft Strategy",
+                "description": "Draft guidance and player selection advice",
+                "use_case": "Draft preparation and in-draft decisions"
+            },
+            "start_sit": {
+                "name": "Start/Sit Decisions",
+                "description": "Quick start/sit recommendations for specific players",
+                "use_case": "Last-minute lineup decisions"
+            },
+            "season_strategy": {
+                "name": "Season Strategy",
+                "description": "Long-term strategic guidance and planning",
+                "use_case": "Playoff preparation and season-long planning"
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "recommendation_types": recommendation_types,
+                "total_types": len(recommendation_types)
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get recommendation types error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get recommendation types: {str(e)}"
         )
 
 

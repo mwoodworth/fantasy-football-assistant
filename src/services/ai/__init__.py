@@ -11,9 +11,13 @@ This module contains AI-powered services including:
 from .claude_client import ClaudeAIClient
 from .ml_pipeline import MLPipeline
 from .insights_engine import InsightsEngine
+from .sentiment_analyzer import SentimentAnalyzer
+from .recommendation_engine import RecommendationEngine
 
 __all__ = [
     "ClaudeAIClient",
     "MLPipeline", 
-    "InsightsEngine"
+    "InsightsEngine",
+    "SentimentAnalyzer",
+    "RecommendationEngine"
 ]
