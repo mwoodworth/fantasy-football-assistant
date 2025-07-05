@@ -2,24 +2,49 @@
 Fantasy Football Assistant - Main Application Entry Point
 
 This is the main FastAPI application for the Assistant Fantasy Football Manager.
-Currently in planning phase - this is a placeholder structure.
+Phase 1: Foundation implementation with database, auth, and basic APIs.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import uvicorn
+import logging
+
+from .config import settings
+from .models.database import create_tables, engine
+from .models import Base
+
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, settings.log_level.upper()),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="Assistant Fantasy Football Manager",
+    title=settings.app_name,
     description="AI-powered fantasy football assistant for draft strategies, lineup optimization, and trade analysis",
-    version="0.1.0",
+    version=settings.app_version,
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+
+# Create database tables on startup
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and perform startup tasks"""
+    logger.info("Starting Fantasy Football Assistant...")
+    
+    # Create database tables
+    create_tables()
+    logger.info("Database tables created/verified")
+    
+    # TODO: Initialize team data
+    # TODO: Set up background tasks for data updates
 
 # CORS middleware
 app.add_middleware(
@@ -123,7 +148,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=6000,
+        port=6001,
         reload=True,
         log_level="info"
     )
