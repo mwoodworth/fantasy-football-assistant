@@ -434,7 +434,7 @@ class TradeAnalyzer:
         
         total_value = team1_value + team2_value
         if total_value == 0:
-            return {'fairness_score': 50, 'winner': 'Even'}
+            return {'fairness_score': 50, 'winner': 'Even', 'value_gap': 0, 'team1_value_percentage': 50, 'team2_value_percentage': 50}
         
         team1_percentage = (team1_value / total_value) * 100
         team2_percentage = (team2_value / total_value) * 100

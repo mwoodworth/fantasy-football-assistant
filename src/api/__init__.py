@@ -2,12 +2,12 @@
 API endpoints for Fantasy Football Assistant
 """
 
-from .auth import auth_router
-from .users import users_router
-from .players import players_router
+from .auth import router as auth_router
+from .players import router as players_router
+from .fantasy import router as fantasy_router
 
 __all__ = [
     "auth_router",
-    "users_router", 
-    "players_router"
+    "players_router", 
+    "fantasy_router"
 ]

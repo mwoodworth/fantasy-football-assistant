@@ -16,9 +16,7 @@ import logging
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api.auth import router as auth_router
-from .api.players import router as players_router
-from .api.fantasy import router as fantasy_router
+from .api import auth_router, players_router, fantasy_router
 
 # Configure logging
 logging.basicConfig(
@@ -99,10 +97,10 @@ async def root():
     <body>
         <div class="container">
             <h1>🏈 Assistant Fantasy Football Manager</h1>
-            <div class="status">Status: Planned - Development Not Started</div>
+            <div class="status">Status: Active - Phase 2 Complete with Mock Data</div>
             
             <div class="features">
-                <h2>Planned Features</h2>
+                <h2>Available Features</h2>
                 <ul>
                     <li>🎯 <strong>Draft Assistant</strong> - Real-time draft suggestions based on team needs</li>
                     <li>📊 <strong>Lineup Optimizer</strong> - Weekly lineup recommendations with matchup analysis</li>
@@ -120,37 +118,32 @@ async def root():
                 <a href="/health">Health Check</a>
             </div>
             
-            <p><em>This project is currently in the planning phase. Check back later for updates!</em></p>
+            <p><em>Phase 2 complete with mock data! Use the CLI tools to seed test data and explore all features.</em></p>
         </div>
     </body>
     </html>
     """
 
-# API placeholder endpoints
-@app.get("/api/players")
-async def get_players():
-    """Get player information (placeholder)"""
-    raise HTTPException(status_code=501, detail="Not implemented yet - project in planning phase")
-
-@app.get("/api/draft-suggestions")
-async def get_draft_suggestions():
-    """Get draft suggestions (placeholder)"""
-    raise HTTPException(status_code=501, detail="Not implemented yet - project in planning phase")
-
-@app.get("/api/lineup-optimizer")
-async def optimize_lineup():
-    """Optimize lineup (placeholder)"""
-    raise HTTPException(status_code=501, detail="Not implemented yet - project in planning phase")
-
-@app.get("/api/waiver-analysis")
-async def analyze_waivers():
-    """Analyze waiver wire (placeholder)"""
-    raise HTTPException(status_code=501, detail="Not implemented yet - project in planning phase")
-
-@app.get("/api/trade-analyzer")
-async def analyze_trade():
-    """Analyze trade proposal (placeholder)"""
-    raise HTTPException(status_code=501, detail="Not implemented yet - project in planning phase")
+# Mock data management endpoint
+@app.get("/api/mock-data/status")
+async def get_mock_data_status():
+    """Get status of mock data in database"""
+    from .models.database import SessionLocal
+    from .models.player import Player, Team
+    from .models.user import User
+    from .models.fantasy import League
+    
+    db = SessionLocal()
+    try:
+        return {
+            "teams": db.query(Team).count(),
+            "players": db.query(Player).count(),
+            "users": db.query(User).count(),
+            "leagues": db.query(League).count(),
+            "mock_data_available": db.query(Player).count() > 0
+        }
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     uvicorn.run(

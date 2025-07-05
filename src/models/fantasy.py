@@ -97,7 +97,7 @@ class FantasyTeam(Base):
     
     # Relationships
     roster = relationship("Roster", back_populates="fantasy_team")
-    trades = relationship("Trade", back_populates="team")
+    trades = relationship("Trade", back_populates="team", foreign_keys="Trade.team_id")
     waiver_claims = relationship("WaiverClaim", back_populates="team")
     
     @property
@@ -166,7 +166,7 @@ class Trade(Base):
     
     league = relationship("League", back_populates="trades")
     user = relationship("User", back_populates="trades")
-    team = relationship("FantasyTeam", back_populates="trades")
+    team = relationship("FantasyTeam", back_populates="trades", foreign_keys=[team_id])
     
     # Trade details
     trade_partner_id = Column(Integer, ForeignKey("fantasy_teams.id"), nullable=False)
