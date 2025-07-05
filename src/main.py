@@ -21,7 +21,7 @@ import time
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router, espn_router
+from .api import auth_router, players_router, fantasy_router, espn_router, ai_router
 
 # Configure logging
 logging.basicConfig(
@@ -156,6 +156,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(players_router, prefix="/api")
 app.include_router(fantasy_router, prefix="/api")
 app.include_router(espn_router, prefix="/api")
+app.include_router(ai_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"
@@ -222,7 +223,7 @@ async def root():
     <body>
         <div class="container">
             <h1>🏈 Assistant Fantasy Football Manager</h1>
-            <div class="status">Status: Active - Phase 2 Complete with Mock Data</div>
+            <div class="status">Status: Active - Phase 3 Development (AI Integration)</div>
             
             <div class="features">
                 <h2>Available Features</h2>
@@ -232,7 +233,10 @@ async def root():
                     <li>🔍 <strong>Waiver Wire Analysis</strong> - Identify pickup targets and trends</li>
                     <li>🤝 <strong>Trade Analyzer</strong> - Evaluate trade proposals with win probability</li>
                     <li>🚨 <strong>Injury Monitoring</strong> - Real-time injury updates and impact analysis</li>
-                    <li>🤖 <strong>AI Insights</strong> - Natural language queries and automated reports</li>
+                    <li>🤖 <strong>AI Chat Assistant</strong> - Natural language queries and intelligent responses</li>
+                    <li>🧠 <strong>ML Predictions</strong> - Player performance forecasting with confidence intervals</li>
+                    <li>📈 <strong>Automated Insights</strong> - AI-generated weekly reports and recommendations</li>
+                    <li>🔮 <strong>Breakout Detection</strong> - ML-powered identification of emerging players</li>
                 </ul>
             </div>
             
@@ -243,8 +247,9 @@ async def root():
                 <a href="/health">Health Check</a>
             </div>
             
-            <p><em>Phase 2 complete with ESPN integration! Use <code>./start.sh</code> to launch both Python and Node.js services.</em></p>
+            <p><em>Phase 3 in development - AI integration underway! Core features from Phase 2 remain fully functional.</em></p>
             <p><strong>ESPN Authentication:</strong> <a href="/static/espn-login.html">ESPN Login Page</a></p>
+            <p><strong>AI Features:</strong> Natural language chat, ML predictions, and automated insights</p>
         </div>
     </body>
     </html>
