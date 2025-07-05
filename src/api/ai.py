@@ -22,6 +22,7 @@ from ..services.ai.insights_engine import insights_engine
 from ..services.ai.sentiment_analyzer import sentiment_analyzer
 from ..services.ai.recommendation_engine import recommendation_engine
 from ..services.ai.weekly_report_generator import weekly_report_generator
+from ..services.ai.analytics_dashboard import analytics_dashboard, AnalyticsTimeframe
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,26 @@ class WeeklyReportRequest(BaseModel):
     league_context: Dict[str, Any] = Field(..., description="League settings and context")
     week: int = Field(..., ge=1, le=18, description="NFL week number")
     include_analysis_details: bool = Field(True, description="Include detailed player analysis")
+
+class PlayerAnalyticsRequest(BaseModel):
+    player_id: int = Field(..., description="Player ID to analyze")
+    timeframe: str = Field("season", description="Timeframe for analysis (current_week, last_4_weeks, season, last_season, career)")
+    comparison_players: Optional[List[int]] = Field(None, description="Player IDs to compare against")
+
+class TeamAnalyticsRequest(BaseModel):
+    team_id: int = Field(..., description="Team ID to analyze")
+    timeframe: str = Field("season", description="Timeframe for analysis")
+    include_projections: bool = Field(True, description="Include future projections")
+
+class LeagueAnalyticsRequest(BaseModel):
+    league_id: str = Field(..., description="League ID to analyze")
+    timeframe: str = Field("season", description="Timeframe for analysis")
+
+class CustomMetricRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50, description="Metric name")
+    description: str = Field(..., max_length=200, description="Metric description")
+    formula: str = Field(..., description="Mathematical formula for the metric")
+    components: List[str] = Field(..., min_items=1, description="Base stats used in formula")
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -1138,6 +1159,394 @@ async def get_weekly_report_template(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get weekly report template: {str(e)}"
+        )
+
+
+@router.post("/analytics/player")
+async def get_player_analytics(
+    analytics_request: PlayerAnalyticsRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get comprehensive analytics for a specific player
+    
+    Provides detailed performance metrics, trends, and visualizations including:
+    - Performance metrics (points, consistency, efficiency)
+    - Trend analysis with directional indicators
+    - Interactive charts (performance, consistency, opportunity)
+    - Player comparisons and rankings
+    - AI-generated insights and recommendations
+    """
+    try:
+        logger.info(f"Player analytics request for player {analytics_request.player_id} by user {current_user.id}")
+        
+        # Map timeframe string to enum
+        try:
+            timeframe = AnalyticsTimeframe(analytics_request.timeframe)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid timeframe: {analytics_request.timeframe}"
+            )
+        
+        # Generate player analytics
+        analytics = await analytics_dashboard.get_player_analytics(
+            player_id=analytics_request.player_id,
+            timeframe=timeframe,
+            comparison_players=analytics_request.comparison_players
+        )
+        
+        return {
+            "success": True,
+            "data": analytics,
+            "meta": {
+                "analytics_type": "player",
+                "player_id": analytics_request.player_id,
+                "timeframe": analytics_request.timeframe,
+                "has_comparisons": analytics_request.comparison_players is not None,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Player analytics error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate player analytics: {str(e)}"
+        )
+
+
+@router.post("/analytics/team")
+async def get_team_analytics(
+    analytics_request: TeamAnalyticsRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get comprehensive analytics for a fantasy team
+    
+    Provides complete team performance analysis including:
+    - Team performance metrics and rankings
+    - Position strength analysis and weaknesses
+    - Scoring trends and efficiency metrics
+    - Playoff probability and championship odds
+    - Interactive charts and visualizations
+    - Strategic insights and recommendations
+    """
+    try:
+        logger.info(f"Team analytics request for team {analytics_request.team_id} by user {current_user.id}")
+        
+        # Map timeframe string to enum
+        try:
+            timeframe = AnalyticsTimeframe(analytics_request.timeframe)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid timeframe: {analytics_request.timeframe}"
+            )
+        
+        # Generate team analytics
+        analytics = await analytics_dashboard.get_team_analytics(
+            team_id=analytics_request.team_id,
+            timeframe=timeframe,
+            include_projections=analytics_request.include_projections
+        )
+        
+        return {
+            "success": True,
+            "data": analytics,
+            "meta": {
+                "analytics_type": "team",
+                "team_id": analytics_request.team_id,
+                "timeframe": analytics_request.timeframe,
+                "includes_projections": analytics_request.include_projections,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Team analytics error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate team analytics: {str(e)}"
+        )
+
+
+@router.post("/analytics/league")
+async def get_league_analytics(
+    analytics_request: LeagueAnalyticsRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get comprehensive league-wide analytics
+    
+    Provides complete league analysis including:
+    - League scoring statistics and distributions
+    - Top performers and trending players
+    - Position scarcity and market values
+    - Trade activity and waiver wire trends
+    - Competitive balance and parity analysis
+    - Market intelligence and insights
+    """
+    try:
+        logger.info(f"League analytics request for league {analytics_request.league_id} by user {current_user.id}")
+        
+        # Map timeframe string to enum
+        try:
+            timeframe = AnalyticsTimeframe(analytics_request.timeframe)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid timeframe: {analytics_request.timeframe}"
+            )
+        
+        # Generate league analytics
+        analytics = await analytics_dashboard.get_league_analytics(
+            league_id=analytics_request.league_id,
+            timeframe=timeframe
+        )
+        
+        return {
+            "success": True,
+            "data": analytics,
+            "meta": {
+                "analytics_type": "league",
+                "league_id": analytics_request.league_id,
+                "timeframe": analytics_request.timeframe,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"League analytics error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate league analytics: {str(e)}"
+        )
+
+
+@router.post("/analytics/custom-metric")
+async def create_custom_metric(
+    metric_request: CustomMetricRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Create a custom analytics metric
+    
+    Allows users to define their own metrics using mathematical formulas
+    based on available player/team statistics. Useful for creating
+    specialized analytics that aren't available in standard metrics.
+    """
+    try:
+        logger.info(f"Custom metric creation request from user {current_user.id}: {metric_request.name}")
+        
+        # Create custom metric
+        custom_metric = await analytics_dashboard.create_custom_metric(
+            user_id=current_user.id,
+            name=metric_request.name,
+            description=metric_request.description,
+            formula=metric_request.formula,
+            components=metric_request.components
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "metric_id": custom_metric.metric_id,
+                "name": custom_metric.name,
+                "description": custom_metric.description,
+                "formula": custom_metric.formula,
+                "components": custom_metric.components,
+                "status": "created"
+            },
+            "meta": {
+                "created_by": current_user.id,
+                "created_at": datetime.now().isoformat()
+            }
+        }
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid metric definition: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Custom metric creation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create custom metric: {str(e)}"
+        )
+
+
+@router.get("/analytics/real-time/{entity_type}/{entity_id}")
+async def get_real_time_analytics(
+    entity_type: str,
+    entity_id: str,
+    update_interval: int = Query(60, ge=30, le=300, description="Update interval in seconds"),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get real-time analytics updates for a player, team, or league
+    
+    Provides live analytics updates with change detection and alerts.
+    Useful for monitoring during games or tracking rapid changes
+    in rankings, scores, or other metrics.
+    """
+    try:
+        logger.info(f"Real-time analytics request for {entity_type} {entity_id} by user {current_user.id}")
+        
+        # Validate entity type
+        valid_types = ["player", "team", "league"]
+        if entity_type not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid entity type: {entity_type}. Must be one of {valid_types}"
+            )
+        
+        # Get real-time updates
+        updates = await analytics_dashboard.get_real_time_updates(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            update_interval=update_interval
+        )
+        
+        return {
+            "success": True,
+            "data": updates,
+            "meta": {
+                "entity_type": entity_type,
+                "entity_id": entity_id,
+                "update_interval": update_interval,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Real-time analytics error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get real-time analytics: {str(e)}"
+        )
+
+
+@router.post("/analytics/export")
+async def export_analytics_data(
+    analytics_data: Dict[str, Any],
+    format: str = Query("json", description="Export format (json, csv, pdf)"),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Export analytics data in various formats
+    
+    Converts analytics data to downloadable formats including JSON, CSV,
+    and PDF. Useful for creating reports, sharing analysis, or 
+    importing data into other tools.
+    """
+    try:
+        logger.info(f"Analytics export request in {format} format by user {current_user.id}")
+        
+        # Validate format
+        valid_formats = ["json", "csv", "pdf"]
+        if format not in valid_formats:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid export format: {format}. Must be one of {valid_formats}"
+            )
+        
+        # Export analytics
+        export_result = await analytics_dashboard.export_analytics(
+            analytics_data=analytics_data,
+            format=format
+        )
+        
+        return {
+            "success": True,
+            "data": export_result,
+            "meta": {
+                "export_format": format,
+                "requested_by": current_user.id,
+                "exported_at": datetime.now().isoformat()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Analytics export error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to export analytics: {str(e)}"
+        )
+
+
+@router.get("/analytics/timeframes")
+async def get_analytics_timeframes(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get available timeframes for analytics requests
+    
+    Returns all supported timeframes with descriptions to help
+    users understand what data will be included in each timeframe.
+    """
+    try:
+        timeframes = {
+            "current_week": {
+                "name": "Current Week",
+                "description": "Analytics for the current NFL week only",
+                "data_range": "Single week data"
+            },
+            "last_4_weeks": {
+                "name": "Last 4 Weeks", 
+                "description": "Recent performance over the last 4 weeks",
+                "data_range": "4 weeks of data"
+            },
+            "season": {
+                "name": "Current Season",
+                "description": "Full current season analytics",
+                "data_range": "Current season to date"
+            },
+            "last_season": {
+                "name": "Previous Season",
+                "description": "Complete previous season analytics",
+                "data_range": "Full previous season"
+            },
+            "career": {
+                "name": "Career",
+                "description": "All-time career analytics",
+                "data_range": "All available historical data"
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "timeframes": timeframes,
+                "default": "season",
+                "total_timeframes": len(timeframes)
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get timeframes error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get analytics timeframes: {str(e)}"
         )
 
 

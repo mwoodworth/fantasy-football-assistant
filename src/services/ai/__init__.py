@@ -14,6 +14,7 @@ from .insights_engine import InsightsEngine
 from .sentiment_analyzer import SentimentAnalyzer
 from .recommendation_engine import RecommendationEngine
 from .weekly_report_generator import WeeklyReportGenerator
+from .analytics_dashboard import AnalyticsDashboard
 
 __all__ = [
     "ClaudeAIClient",
@@ -21,5 +22,6 @@ __all__ = [
     "InsightsEngine",
     "SentimentAnalyzer",
     "RecommendationEngine",
-    "WeeklyReportGenerator"
+    "WeeklyReportGenerator",
+    "AnalyticsDashboard"
 ]
