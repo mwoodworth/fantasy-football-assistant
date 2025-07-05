@@ -19,6 +19,7 @@ const cacheMiddleware = require('./middleware/cache');
 
 // Route imports
 const healthRoutes = require('./routes/health');
+const authRoutes = require('./routes/auth');
 const leagueRoutes = require('./routes/leagues');
 const playerRoutes = require('./routes/players');
 const teamRoutes = require('./routes/teams');
@@ -80,6 +81,7 @@ app.get('/', (req, res) => {
     description: 'Node.js service for ESPN Fantasy Football API integration',
     endpoints: {
       health: '/health',
+      auth: '/auth',
       leagues: '/api/leagues',
       players: '/api/players', 
       teams: '/api/teams',
@@ -91,6 +93,9 @@ app.get('/', (req, res) => {
 
 // Health check routes (no auth required)
 app.use('/health', healthRoutes);
+
+// Auth routes (no auth required for login)
+app.use('/auth', authRoutes);
 
 // API routes (require authentication)
 app.use('/api/leagues', authMiddleware, cacheMiddleware, leagueRoutes);
@@ -113,6 +118,9 @@ app.get('/api/docs', (req, res) => {
     endpoints: {
       'GET /health': 'Service health check',
       'GET /health/espn': 'ESPN API connectivity check',
+      'POST /auth/login': 'ESPN login to get cookies',
+      'POST /auth/validate-cookies': 'Validate ESPN cookies',
+      'GET /auth/cookie-status': 'Check current cookie status',
       'GET /api/leagues/:leagueId': 'Get league information',
       'GET /api/leagues/:leagueId/teams': 'Get all teams in league',
       'GET /api/leagues/:leagueId/settings': 'Get league settings',

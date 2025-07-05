@@ -284,6 +284,27 @@ class ESPNServiceClient:
             f'/api/draft/{league_id}/summary',
             params={'season': season}
         )
+    
+    # Authentication Methods
+    async def login_to_espn(self, email: str, password: str) -> Dict[str, Any]:
+        """Login to ESPN and get cookies"""
+        return await self._make_request(
+            'POST',
+            '/auth/login',
+            json={'email': email, 'password': password}
+        )
+    
+    async def validate_espn_cookies(self, espn_s2: str, swid: str) -> Dict[str, Any]:
+        """Validate ESPN cookies"""
+        return await self._make_request(
+            'POST',
+            '/auth/validate-cookies',
+            json={'espn_s2': espn_s2, 'swid': swid}
+        )
+    
+    async def get_cookie_status(self) -> Dict[str, Any]:
+        """Get current ESPN cookie status"""
+        return await self._make_request('GET', '/auth/cookie-status')
 
 
 class ESPNDataService:

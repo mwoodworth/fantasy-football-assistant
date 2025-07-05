@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESPN Fantasy Football Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .cookies-display {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏈 ESPN Fantasy Football Authentication</h1>
+        <p>Use this form to login to ESPN and get your authentication cookies for private league access.</p>
+        
+        <!-- Cookie Status Check -->
+        <div class="form-group">
+            <button onclick="checkCookieStatus()">Check Current Cookie Status</button>
+        </div>
+        
+        <!-- Login Form -->
+        <form id="loginForm" onsubmit="performLogin(event)">
+            <div class="form-group">
+                <label for="email">ESPN Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">ESPN Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <div class="form-group">
+                <button type="submit" id="loginBtn">Login to ESPN</button>
+                <button type="button" onclick="clearResults()">Clear Results</button>
+            </div>
+        </form>
+        
+        <!-- Results Display -->
+        <div id="results" class="hidden">
+            <h3>Results:</h3>
+            <div id="statusMessage"></div>
+            <div id="cookiesDisplay" class="cookies-display hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:6001/api/espn'; // Python FastAPI
+        const NODE_API_BASE = 'http://localhost:3001'; // Node.js ESPN service
+
+        async function checkCookieStatus() {
+            try {
+                showStatus('Checking cookie status...', 'info');
+                
+                // Try Python API first, fall back to Node.js
+                let response;
+                try {
+                    response = await fetch(`${API_BASE}/auth/cookie-status`);
+                } catch (e) {
+                    console.log('Python API not available, using Node.js service directly');
+                    response = await fetch(`${NODE_API_BASE}/auth/cookie-status`);
+                }
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const status = data.configured ? 'Configured ✅' : 'Not Configured ❌';
+                    showStatus(`Cookie Status: ${status}`, data.configured ? 'success' : 'error');
+                    
+                    if (data.configured) {
+                        showCookies({
+                            message: 'ESPN cookies are already configured in the service',
+                            cookies: data.cookies
+                        });
+                    }
+                } else {
+                    showStatus(`Error: ${data.detail || 'Failed to check cookie status'}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function performLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginBtn = document.getElementById('loginBtn');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            
+            try {
+                showStatus('Attempting ESPN login...', 'info');
+                
+                // Try Python API first, fall back to Node.js
+                let response;
+                try {
+                    response = await fetch(`${API_BASE}/auth/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+                } catch (e) {
+                    console.log('Python API not available, using Node.js service directly');
+                    response = await fetch(`${NODE_API_BASE}/auth/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    showStatus('ESPN login successful! 🎉', 'success');
+                    showCookies(data);
+                    
+                    // Clear form
+                    document.getElementById('loginForm').reset();
+                } else {
+                    const errorMsg = data.error || data.message || data.detail || 'Login failed';
+                    showStatus(`Login failed: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login to ESPN';
+            }
+        }
+
+        function showStatus(message, type) {
+            const resultsDiv = document.getElementById('results');
+            const statusDiv = document.getElementById('statusMessage');
+            
+            resultsDiv.classList.remove('hidden');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        function showCookies(data) {
+            const cookiesDiv = document.getElementById('cookiesDisplay');
+            
+            if (data.cookies) {
+                cookiesDiv.classList.remove('hidden');
+                cookiesDiv.innerHTML = `
+                    <strong>ESPN Cookies:</strong><br>
+                    ESPN_COOKIE_S2=${data.cookies.espn_s2}<br>
+                    ESPN_COOKIE_SWID=${data.cookies.swid}<br><br>
+                    
+                    <strong>Instructions:</strong><br>
+                    Add these environment variables to your .env file in the espn-service directory:
+                    <br><br>
+                    
+                    <strong>Configuration:</strong><br>
+                    ${data.instructions ? JSON.stringify(data.instructions, null, 2) : 'See above values'}
+                `;
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('cookiesDisplay').classList.add('hidden');
+        }
+
+        // Check cookie status on page load
+        window.addEventListener('load', checkCookieStatus);
+    </script>
+</body>
+</html>

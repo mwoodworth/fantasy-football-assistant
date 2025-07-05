@@ -12,11 +12,16 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import uvicorn
 import logging
+import subprocess
+import os
+import signal
+import atexit
+import time
 
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router
+from .api import auth_router, players_router, fantasy_router, espn_router
 
 # Configure logging
 logging.basicConfig(
@@ -24,6 +29,83 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# Global variable to track ESPN service process
+espn_service_process = None
+
+def start_espn_service():
+    """Start the Node.js ESPN service"""
+    global espn_service_process
+    
+    try:
+        espn_service_dir = Path(__file__).parent.parent / "espn-service"
+        
+        if not espn_service_dir.exists():
+            logger.warning(f"ESPN service directory not found: {espn_service_dir}")
+            return None
+        
+        # Check if Node.js is available
+        try:
+            subprocess.run(["node", "--version"], capture_output=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.error("Node.js not found. Please install Node.js to run the ESPN service.")
+            return None
+        
+        # Check if package.json exists
+        package_json_path = espn_service_dir / "package.json"
+        if not package_json_path.exists():
+            logger.error(f"package.json not found in {espn_service_dir}")
+            return None
+        
+        # Check if node_modules exists, install if not
+        node_modules_path = espn_service_dir / "node_modules"
+        if not node_modules_path.exists():
+            logger.info("Installing ESPN service dependencies...")
+            subprocess.run(["npm", "install"], cwd=espn_service_dir, check=True)
+        
+        # Start the ESPN service
+        logger.info("Starting ESPN service...")
+        espn_service_process = subprocess.Popen(
+            ["npm", "run", "dev"],
+            cwd=espn_service_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        
+        # Give it a moment to start
+        time.sleep(2)
+        
+        # Check if process is still running
+        if espn_service_process.poll() is None:
+            logger.info("ESPN service started successfully on port 3001")
+            return espn_service_process
+        else:
+            stdout, stderr = espn_service_process.communicate()
+            logger.error(f"ESPN service failed to start: {stderr}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error starting ESPN service: {e}")
+        return None
+
+def stop_espn_service():
+    """Stop the Node.js ESPN service"""
+    global espn_service_process
+    
+    if espn_service_process and espn_service_process.poll() is None:
+        logger.info("Stopping ESPN service...")
+        espn_service_process.terminate()
+        try:
+            espn_service_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            logger.warning("ESPN service did not stop gracefully, forcing termination")
+            espn_service_process.kill()
+        espn_service_process = None
+        logger.info("ESPN service stopped")
+
+# Register cleanup function
+atexit.register(stop_espn_service)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -44,8 +126,21 @@ async def startup_event():
     create_tables()
     logger.info("Database tables created/verified")
     
+    # Start ESPN service
+    espn_process = start_espn_service()
+    if espn_process:
+        logger.info("ESPN service integration enabled")
+    else:
+        logger.warning("ESPN service not available - some features may be limited")
+    
     # TODO: Initialize team data
     # TODO: Set up background tasks for data updates
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup tasks on shutdown"""
+    logger.info("Shutting down Fantasy Football Assistant...")
+    stop_espn_service()
 
 # CORS middleware
 app.add_middleware(
@@ -60,6 +155,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api")
 app.include_router(players_router, prefix="/api")
 app.include_router(fantasy_router, prefix="/api")
+app.include_router(espn_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"
@@ -70,7 +166,36 @@ if static_path.exists():
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "message": "Fantasy Football Assistant is running"}
+    global espn_service_process
+    
+    # Check ESPN service status
+    espn_status = "unknown"
+    if espn_service_process:
+        if espn_service_process.poll() is None:
+            try:
+                import httpx
+                async with httpx.AsyncClient() as client:
+                    response = await client.get("http://localhost:3001/health", timeout=2)
+                    espn_status = "healthy" if response.status_code == 200 else "unhealthy"
+            except:
+                espn_status = "unreachable"
+        else:
+            espn_status = "stopped"
+    else:
+        espn_status = "not_started"
+    
+    return {
+        "status": "healthy", 
+        "message": "Fantasy Football Assistant is running",
+        "services": {
+            "fastapi": "healthy",
+            "espn_service": espn_status
+        },
+        "ports": {
+            "main_api": 6001,
+            "espn_service": 3001
+        }
+    }
 
 # Root endpoint
 @app.get("/", response_class=HTMLResponse)
@@ -118,7 +243,8 @@ async def root():
                 <a href="/health">Health Check</a>
             </div>
             
-            <p><em>Phase 2 complete with mock data! Use the CLI tools to seed test data and explore all features.</em></p>
+            <p><em>Phase 2 complete with ESPN integration! Use <code>./start.sh</code> to launch both Python and Node.js services.</em></p>
+            <p><strong>ESPN Authentication:</strong> <a href="/static/espn-login.html">ESPN Login Page</a></p>
         </div>
     </body>
     </html>

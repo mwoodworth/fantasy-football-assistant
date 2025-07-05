@@ -5,6 +5,7 @@ ESPN Integration API endpoints
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
+from pydantic import BaseModel
 
 from ..models.database import get_db
 from ..models.user import User
@@ -15,6 +16,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/espn", tags=["espn"])
+
+
+# Pydantic models for request/response
+class ESPNLoginRequest(BaseModel):
+    email: str
+    password: str
+
+class ESPNCookieValidationRequest(BaseModel):
+    espn_s2: str
+    swid: str
 
 
 @router.get("/health")
@@ -35,6 +46,59 @@ async def check_espn_service_health():
     except Exception as e:
         logger.error(f"ESPN health check error: {e}")
         raise HTTPException(status_code=500, detail="ESPN health check failed")
+
+
+# Authentication endpoints (no user auth required)
+@router.post("/auth/login")
+async def espn_login(login_request: ESPNLoginRequest):
+    """Login to ESPN and get cookies for private league access"""
+    try:
+        logger.info(f"ESPN login attempt for {login_request.email}")
+        
+        async with espn_service.client as client:
+            result = await client.login_to_espn(login_request.email, login_request.password)
+        
+        logger.info(f"ESPN login successful for {login_request.email}")
+        return result
+        
+    except ESPNServiceError as e:
+        logger.error(f"ESPN login failed for {login_request.email}: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"ESPN login error for {login_request.email}: {e}")
+        raise HTTPException(status_code=500, detail="ESPN login failed")
+
+
+@router.post("/auth/validate-cookies")
+async def validate_espn_cookies(cookie_request: ESPNCookieValidationRequest):
+    """Validate ESPN cookies for API access"""
+    try:
+        async with espn_service.client as client:
+            result = await client.validate_espn_cookies(cookie_request.espn_s2, cookie_request.swid)
+        
+        return result
+        
+    except ESPNServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"ESPN cookie validation error: {e}")
+        raise HTTPException(status_code=500, detail="Cookie validation failed")
+
+
+@router.get("/auth/cookie-status")
+async def get_espn_cookie_status():
+    """Get current ESPN cookie configuration status"""
+    try:
+        async with espn_service.client as client:
+            result = await client.get_cookie_status()
+        
+        return result
+        
+    except ESPNServiceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"ESPN cookie status error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get cookie status")
 
 
 @router.get("/leagues/{league_id}")
