@@ -55,7 +55,8 @@ An AI-powered fantasy football assistant that provides intelligent draft strateg
 
 ### Prerequisites
 - Python 3.11+
-- PostgreSQL 14+
+- Node.js 18+ (for frontend and ESPN service)
+- PostgreSQL 14+ (or SQLite for development)
 - Anthropic API key
 
 ### Installation
@@ -90,14 +91,26 @@ cp .env.example .env
 alembic upgrade head
 ```
 
-6. Run the development server:
-```bash
-uvicorn src.main:app --reload --port 8000
-```
+6. Run the development servers:
 
-7. Access the API:
-- **API Documentation**: http://localhost:8000/docs
-- **Health Check**: http://localhost:8000/health
+   **Option 1: Use the startup script (recommended)**
+   ```bash
+   ./start.sh
+   ```
+   
+   **Option 2: Run services manually**
+   ```bash
+   # Terminal 1: Backend API
+   uvicorn src.main:app --reload --port 6001
+   
+   # Terminal 2: Frontend (in frontend/ directory)
+   cd frontend && npm run dev
+   ```
+
+7. Access the application:
+- **Frontend**: http://localhost:5173
+- **API Documentation**: http://localhost:6001/docs
+- **Health Check**: http://localhost:6001/health
 
 ## API Endpoints
 
@@ -217,11 +230,15 @@ fantasy-football-assistant/
 - ✅ Breakout player detection with multi-factor analysis
 - ✅ Game script prediction with 7 script types
 
-### 🔄 Phase 5: Frontend & Polish (Planned)
-- 🔄 React frontend with TypeScript
-- 🔄 Real-time dashboard
-- 🔄 Mobile responsive design
-- 🔄 Performance optimization
+### 🚧 Phase 5: Frontend & Polish (In Progress)
+- ✅ React frontend with TypeScript + Vite
+- ✅ Authentication flow with JWT token management
+- ✅ Responsive layout with sidebar navigation
+- ✅ Tailwind CSS design system
+- 🔄 Real-time dashboard implementation
+- 🔄 AI chat interface
+- 🔄 Player management features
+- 🔄 Analytics visualizations
 
 ## Key Features Implemented
 
