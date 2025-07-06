@@ -11,6 +11,7 @@ from typing import Optional, Dict, Any, List
 from pydantic import BaseModel, Field
 import logging
 import uuid
+import numpy as np
 
 from ..models.database import get_db
 from ..models.user import User
@@ -23,6 +24,7 @@ from ..services.ai.sentiment_analyzer import sentiment_analyzer
 from ..services.ai.recommendation_engine import recommendation_engine
 from ..services.ai.weekly_report_generator import weekly_report_generator
 from ..services.ai.analytics_dashboard import analytics_dashboard, AnalyticsTimeframe
+from ..services.ai.injury_predictor import injury_predictor, InjuryRiskLevel
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,22 @@ class PlayerAnalyticsRequest(BaseModel):
     player_id: int = Field(..., description="Player ID to analyze")
     timeframe: str = Field("season", description="Timeframe for analysis (current_week, last_4_weeks, season, last_season, career)")
     comparison_players: Optional[List[int]] = Field(None, description="Player IDs to compare against")
+
+class InjuryPredictionRequest(BaseModel):
+    player_id: int = Field(..., description="Player ID to analyze for injury risk")
+    player_data: Dict[str, Any] = Field(..., description="Current player data (age, position, usage, etc.)")
+    game_context: Optional[Dict[str, Any]] = Field(None, description="Game context (opponent, weather, etc.)")
+    include_recommendations: bool = Field(True, description="Include injury prevention recommendations")
+
+class TeamInjuryRiskRequest(BaseModel):
+    team_roster: List[Dict[str, Any]] = Field(..., min_items=1, max_items=20, description="Team roster with player data")
+    game_context: Optional[Dict[str, Any]] = Field(None, description="Game context for all players")
+    risk_threshold: float = Field(0.4, ge=0.0, le=1.0, description="Minimum risk level to flag players")
+
+class InjuryHistoryRequest(BaseModel):
+    player_id: int = Field(..., description="Player ID")
+    include_predictions: bool = Field(True, description="Include future injury risk predictions")
+    timeframe_weeks: int = Field(52, ge=1, le=104, description="Weeks of history to analyze")
 
 class TeamAnalyticsRequest(BaseModel):
     team_id: int = Field(..., description="Team ID to analyze")
@@ -1606,6 +1624,341 @@ async def _train_models_background(retrain_all: bool, user_id: int):
             
     except Exception as e:
         logger.error(f"Background model training error: {e}")
+
+
+# Injury Prediction Endpoints
+
+@router.post("/injury/predict")
+async def predict_player_injury_risk(
+    injury_request: InjuryPredictionRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Predict injury risk for a specific player
+    
+    Analyzes multiple factors to predict injury probability including:
+    - Player demographics and injury history
+    - Current usage patterns and workload
+    - Game conditions and context
+    - Biomechanical risk factors
+    
+    Returns comprehensive risk assessment with recommendations.
+    """
+    try:
+        logger.info(f"Injury prediction request for player {injury_request.player_id} by user {current_user.id}")
+        
+        # Get injury risk prediction
+        prediction = await injury_predictor.predict_player_injury_risk(
+            player_id=injury_request.player_id,
+            player_data=injury_request.player_data,
+            game_context=injury_request.game_context
+        )
+        
+        # Convert prediction to JSON-serializable format
+        prediction_dict = {
+            "player_id": prediction.player_id,
+            "player_name": prediction.player_name,
+            "position": prediction.position,
+            "overall_risk_level": prediction.overall_risk_level.value,
+            "overall_risk_score": prediction.overall_risk_score,
+            "confidence": prediction.confidence,
+            "injury_type_risks": {
+                injury_type.value: risk for injury_type, risk in prediction.injury_type_risks.items()
+            },
+            "risk_factors": prediction.risk_factors,
+            "protective_factors": prediction.protective_factors,
+            "prediction_date": prediction.prediction_date.isoformat(),
+            "model_version": prediction.model_version,
+            "data_freshness": prediction.data_freshness
+        }
+        
+        # Add recommendations if requested
+        if injury_request.include_recommendations:
+            prediction_dict["recommendations"] = prediction.recommendations
+            prediction_dict["monitoring_points"] = prediction.monitoring_points
+        
+        return {
+            "success": True,
+            "data": prediction_dict,
+            "meta": {
+                "prediction_type": "injury_risk",
+                "player_id": injury_request.player_id,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat(),
+                "includes_recommendations": injury_request.include_recommendations
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Injury prediction error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to predict injury risk: {str(e)}"
+        )
+
+
+@router.post("/injury/team-risk-assessment")
+async def assess_team_injury_risks(
+    team_request: TeamInjuryRiskRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Assess injury risks for entire team roster
+    
+    Analyzes injury risk for all players on a team and identifies:
+    - High-risk players requiring attention
+    - Overall team injury vulnerability
+    - Risk mitigation strategies
+    - Depth chart considerations
+    """
+    try:
+        logger.info(f"Team injury risk assessment for {len(team_request.team_roster)} players by user {current_user.id}")
+        
+        # Get predictions for all players
+        all_predictions = await injury_predictor.predict_team_injury_risks(
+            team_roster=team_request.team_roster,
+            game_context=team_request.game_context
+        )
+        
+        # Filter high-risk players
+        high_risk_players = [
+            pred for pred in all_predictions 
+            if pred.overall_risk_score >= team_request.risk_threshold
+        ]
+        
+        # Calculate team risk metrics
+        risk_scores = [pred.overall_risk_score for pred in all_predictions]
+        team_metrics = {
+            "average_risk_score": np.mean(risk_scores),
+            "max_risk_score": np.max(risk_scores),
+            "high_risk_player_count": len(high_risk_players),
+            "team_risk_level": "high" if len(high_risk_players) >= 3 else "moderate" if len(high_risk_players) >= 1 else "low"
+        }
+        
+        # Format predictions
+        formatted_predictions = []
+        for pred in all_predictions:
+            formatted_predictions.append({
+                "player_id": pred.player_id,
+                "player_name": pred.player_name,
+                "position": pred.position,
+                "risk_level": pred.overall_risk_level.value,
+                "risk_score": pred.overall_risk_score,
+                "confidence": pred.confidence,
+                "top_risk_factors": pred.risk_factors[:3],
+                "needs_attention": pred.overall_risk_score >= team_request.risk_threshold
+            })
+        
+        # Format high-risk players with detailed info
+        high_risk_detailed = []
+        for pred in high_risk_players:
+            high_risk_detailed.append({
+                "player_id": pred.player_id,
+                "player_name": pred.player_name,
+                "position": pred.position,
+                "risk_level": pred.overall_risk_level.value,
+                "risk_score": pred.overall_risk_score,
+                "risk_factors": pred.risk_factors,
+                "recommendations": pred.recommendations,
+                "monitoring_points": pred.monitoring_points
+            })
+        
+        return {
+            "success": True,
+            "data": {
+                "team_metrics": team_metrics,
+                "all_players": formatted_predictions,
+                "high_risk_players": high_risk_detailed,
+                "risk_summary": {
+                    "total_players": len(all_predictions),
+                    "high_risk_count": len(high_risk_players),
+                    "risk_threshold": team_request.risk_threshold,
+                    "average_team_risk": team_metrics["average_risk_score"]
+                }
+            },
+            "meta": {
+                "assessment_type": "team_injury_risk",
+                "player_count": len(team_request.team_roster),
+                "risk_threshold": team_request.risk_threshold,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Team injury risk assessment error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to assess team injury risks: {str(e)}"
+        )
+
+
+@router.get("/injury/risk-levels")
+async def get_injury_risk_levels(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get available injury risk levels and their descriptions
+    
+    Returns all supported risk levels with score ranges and 
+    recommendations for each level.
+    """
+    try:
+        risk_levels = {
+            "very_low": {
+                "score_range": "0.0 - 0.1",
+                "description": "Minimal injury risk",
+                "color": "green",
+                "recommendation": "Continue standard practices"
+            },
+            "low": {
+                "score_range": "0.1 - 0.2", 
+                "description": "Below average injury risk",
+                "color": "lightgreen",
+                "recommendation": "Maintain current injury prevention"
+            },
+            "moderate": {
+                "score_range": "0.2 - 0.35",
+                "description": "Average injury risk",
+                "color": "yellow", 
+                "recommendation": "Monitor closely, standard precautions"
+            },
+            "elevated": {
+                "score_range": "0.35 - 0.5",
+                "description": "Above average injury risk",
+                "color": "orange",
+                "recommendation": "Enhanced monitoring and prevention"
+            },
+            "high": {
+                "score_range": "0.5 - 0.7",
+                "description": "High injury risk",
+                "color": "red",
+                "recommendation": "Significant risk mitigation needed"
+            },
+            "critical": {
+                "score_range": "0.7 - 1.0",
+                "description": "Critical injury risk",
+                "color": "darkred",
+                "recommendation": "Immediate intervention required"
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "risk_levels": risk_levels,
+                "total_levels": len(risk_levels),
+                "score_range": "0.0 - 1.0"
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get risk levels error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get risk levels: {str(e)}"
+        )
+
+
+@router.post("/injury/history-analysis")
+async def analyze_injury_history(
+    history_request: InjuryHistoryRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Analyze player's injury history and patterns
+    
+    Provides comprehensive analysis of:
+    - Historical injury patterns
+    - Recovery time trends
+    - Injury type susceptibility
+    - Future risk predictions
+    """
+    try:
+        logger.info(f"Injury history analysis for player {history_request.player_id} by user {current_user.id}")
+        
+        # Mock injury history analysis - would integrate with actual data
+        # In production, this would query the database for historical injury data
+        
+        injury_history = {
+            "player_id": history_request.player_id,
+            "timeframe_weeks": history_request.timeframe_weeks,
+            "total_injuries": 3,
+            "games_missed": 8,
+            "injury_types": {
+                "soft_tissue": 2,
+                "joint": 1,
+                "impact": 0,
+                "overuse": 0,
+                "contact": 0
+            },
+            "seasonal_pattern": {
+                "early_season": 1,
+                "mid_season": 1, 
+                "late_season": 1,
+                "playoffs": 0
+            },
+            "recovery_trends": {
+                "average_recovery_days": 18.7,
+                "fastest_recovery": 7,
+                "longest_recovery": 35,
+                "recovery_improving": True
+            },
+            "injury_frequency": 0.6,  # injuries per season
+            "vulnerability_score": 0.45,
+            "key_patterns": [
+                "Higher injury rate in late season",
+                "Soft tissue injuries most common",
+                "Recovery times improving over career"
+            ]
+        }
+        
+        # Add future predictions if requested
+        future_predictions = None
+        if history_request.include_predictions:
+            # Mock future prediction - would use actual models
+            future_predictions = {
+                "next_4_weeks_risk": 0.25,
+                "season_injury_probability": 0.40,
+                "most_likely_injury_type": "soft_tissue",
+                "recommended_monitoring": [
+                    "Hamstring flexibility",
+                    "Workload management", 
+                    "Recovery protocols"
+                ]
+            }
+        
+        return {
+            "success": True,
+            "data": {
+                "injury_history": injury_history,
+                "future_predictions": future_predictions if history_request.include_predictions else None,
+                "risk_assessment": {
+                    "injury_prone": injury_history["vulnerability_score"] > 0.4,
+                    "primary_concerns": ["Soft tissue injuries", "Late season fatigue"],
+                    "strength_areas": ["Good recovery response", "No major joint issues"]
+                }
+            },
+            "meta": {
+                "analysis_type": "injury_history",
+                "player_id": history_request.player_id,
+                "timeframe_weeks": history_request.timeframe_weeks,
+                "includes_predictions": history_request.include_predictions,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Injury history analysis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze injury history: {str(e)}"
+        )
 
 
 # Initialize ML models on startup
