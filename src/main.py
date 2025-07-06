@@ -21,7 +21,7 @@ import time
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router
+from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router, teams_router
 
 # Configure logging
 logging.basicConfig(
@@ -159,6 +159,7 @@ app.include_router(espn_router, prefix="/api")
 app.include_router(espn_enhanced_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(teams_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"

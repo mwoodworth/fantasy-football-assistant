@@ -11,7 +11,9 @@ from pydantic import BaseModel
 
 from ..models.database import get_db
 from ..models.user import User
+from ..models.espn_league import ESPNLeague
 from ..utils.dependencies import get_current_active_user
+from ..services.espn_bridge import get_espn_bridge_service
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -232,16 +234,43 @@ async def get_dashboard_overview(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get dashboard overview data"""
-    # In a real app, this would fetch actual user data
-    return DashboardOverview(
-        total_teams=3,
-        active_leagues=2,
-        weekly_points=127.4,
-        season_rank=4,
-        next_matchup="vs Team Rocket",
-        waiver_claims=2
-    )
+    """Get dashboard overview data from ESPN leagues"""
+    
+    # Get ESPN bridge service
+    espn_bridge = get_espn_bridge_service(db)
+    
+    # Get user's ESPN leagues for stats
+    espn_leagues = db.query(ESPNLeague).filter(
+        ESPNLeague.user_id == current_user.id,
+        ESPNLeague.is_archived == False
+    ).all()
+    
+    if espn_leagues:
+        # Use actual ESPN data
+        active_leagues = len([l for l in espn_leagues if l.is_active])
+        total_teams = len(espn_leagues)
+        
+        # Get dashboard data from ESPN bridge
+        dashboard_data = await espn_bridge.get_user_dashboard_data(current_user.id)
+        
+        return DashboardOverview(
+            total_teams=total_teams,
+            active_leagues=active_leagues,
+            weekly_points=float(dashboard_data.weeklyPoints),
+            season_rank=int(dashboard_data.teamRank.replace('rd', '').replace('st', '').replace('nd', '').replace('th', '')) if dashboard_data.teamRank.replace('rd', '').replace('st', '').replace('nd', '').replace('th', '').isdigit() else 1,
+            next_matchup=f"League: {espn_leagues[0].league_name}" if espn_leagues else "No active leagues",
+            waiver_claims=0  # TODO: Calculate from ESPN data
+        )
+    else:
+        # Fallback to mock data when no ESPN leagues
+        return DashboardOverview(
+            total_teams=0,
+            active_leagues=0,
+            weekly_points=0.0,
+            season_rank=0,
+            next_matchup="Connect ESPN league to see matchups",
+            waiver_claims=0
+        )
 
 
 @router.get("/live-scores", response_model=List[LiveScore])

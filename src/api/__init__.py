@@ -9,6 +9,7 @@ from .espn import router as espn_router
 from .espn_enhanced import router as espn_enhanced_router
 from .ai import router as ai_router
 from .dashboard import router as dashboard_router
+from .teams import router as teams_router
 
 __all__ = [
     "auth_router",
@@ -17,5 +18,6 @@ __all__ = [
     "espn_router",
     "espn_enhanced_router",
     "ai_router",
-    "dashboard_router"
+    "dashboard_router",
+    "teams_router"
 ]
