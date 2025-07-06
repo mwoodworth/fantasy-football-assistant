@@ -55,14 +55,13 @@ class TrendingPlayer(BaseModel):
 
 
 class WaiverTarget(BaseModel):
-    player_id: int
-    name: str
-    position: str
-    team: str
-    ownership_percentage: float
-    projected_points: float
-    matchup_rating: str
-    priority: int
+    player: Player
+    ownershipPercentage: float
+    projectedPoints: float
+    upcomingMatchup: str
+    matchupDifficulty: str  # 'easy', 'medium', or 'hard'
+    recommendation: str
+    priority: str  # 'high', 'medium', or 'low'
 
 
 class DashboardOverview(BaseModel):
@@ -181,23 +180,47 @@ def generate_trending_players() -> List[TrendingPlayer]:
 def generate_waiver_targets() -> List[WaiverTarget]:
     """Generate mock waiver targets"""
     targets = [
-        {"name": "Rico Dowdle", "position": "RB", "team": "DAL", "ownership": 23.4, "projected": 12.8, "matchup": "A"},
-        {"name": "Rome Odunze", "position": "WR", "team": "CHI", "ownership": 31.7, "projected": 11.2, "matchup": "A-"},
-        {"name": "Demarcus Robinson", "position": "WR", "team": "LAR", "ownership": 18.9, "projected": 10.7, "matchup": "B+"},
-        {"name": "Hunter Henry", "position": "TE", "team": "NE", "ownership": 42.1, "projected": 9.4, "matchup": "B"},
+        {
+            "name": "Rico Dowdle", "position": "RB", "team": "DAL", 
+            "ownership": 23.4, "projected": 12.8, "matchup": "vs NYG",
+            "difficulty": "easy", "priority": "high",
+            "recommendation": "Strong add - lead back role with good matchup"
+        },
+        {
+            "name": "Rome Odunze", "position": "WR", "team": "CHI", 
+            "ownership": 31.7, "projected": 11.2, "matchup": "@ GB",
+            "difficulty": "hard", "priority": "medium",
+            "recommendation": "Rookie with upside, tough matchup this week"
+        },
+        {
+            "name": "Demarcus Robinson", "position": "WR", "team": "LAR", 
+            "ownership": 18.9, "projected": 10.7, "matchup": "vs ARI",
+            "difficulty": "medium", "priority": "low",
+            "recommendation": "Desperation play only, low target share"
+        },
+        {
+            "name": "Hunter Henry", "position": "TE", "team": "NE", 
+            "ownership": 42.1, "projected": 9.4, "matchup": "@ MIA",
+            "difficulty": "hard", "priority": "medium",
+            "recommendation": "TE1 upside if you need help at the position"
+        },
     ]
     
     waiver_targets = []
     for i, target in enumerate(targets):
         waiver_targets.append(WaiverTarget(
-            player_id=i+200,
-            name=target["name"],
-            position=target["position"],
-            team=target["team"],
-            ownership_percentage=target["ownership"],
-            projected_points=target["projected"],
-            matchup_rating=target["matchup"],
-            priority=i+1
+            player=Player(
+                id=i+200,
+                name=target["name"],
+                position=target["position"],
+                team=target["team"]
+            ),
+            ownershipPercentage=target["ownership"],
+            projectedPoints=target["projected"],
+            upcomingMatchup=target["matchup"],
+            matchupDifficulty=target["difficulty"],
+            recommendation=target["recommendation"],
+            priority=target["priority"]
         ))
     
     return waiver_targets
