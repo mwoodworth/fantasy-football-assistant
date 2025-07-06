@@ -11,7 +11,7 @@ from ..models.database import get_db
 from ..models.user import User
 from ..models.fantasy import League, FantasyTeam
 from ..utils.dependencies import get_current_active_user
-from ..services.draft_assistant import DraftAssistant
+from ..services.draft_assistant import draft_assistant
 from ..services.lineup_optimizer import LineupOptimizer
 from ..services.waiver_analyzer import WaiverAnalyzer
 from ..services.trade_analyzer import TradeAnalyzer
@@ -68,7 +68,7 @@ async def get_draft_recommendations(
     if not team:
         raise HTTPException(status_code=403, detail="Access denied to this team")
     
-    draft_assistant = DraftAssistant(db, league)
+    # Use the global draft assistant instance
     recommendations = draft_assistant.get_draft_recommendations(
         fantasy_team_id, pick_number, round_number
     )
@@ -95,7 +95,7 @@ async def get_draft_board(
     if not league:
         raise HTTPException(status_code=404, detail="League not found")
     
-    draft_assistant = DraftAssistant(db, league)
+    # Use the global draft assistant instance
     draft_board = draft_assistant.get_draft_board(top_n)
     
     return {
@@ -126,7 +126,7 @@ async def get_draft_analysis(
     if not team:
         raise HTTPException(status_code=403, detail="Access denied to this team")
     
-    draft_assistant = DraftAssistant(db, league)
+    # Use the global draft assistant instance
     analysis = draft_assistant.analyze_draft_capital(fantasy_team_id)
     
     return analysis

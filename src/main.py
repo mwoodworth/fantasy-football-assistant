@@ -21,7 +21,7 @@ import time
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router, espn_router, ai_router, dashboard_router
+from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router
 
 # Configure logging
 logging.basicConfig(
@@ -156,6 +156,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(players_router, prefix="/api")
 app.include_router(fantasy_router, prefix="/api")
 app.include_router(espn_router, prefix="/api")
+app.include_router(espn_enhanced_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 
@@ -279,7 +280,7 @@ async def get_mock_data_status():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "main:app",
+        "src.main:app",
         host="0.0.0.0",
         port=6001,
         reload=True,

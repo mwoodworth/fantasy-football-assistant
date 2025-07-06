@@ -1,424 +1,624 @@
 """
-Draft Assistant service for fantasy football draft recommendations
+Draft Assistant Service for ESPN League Integration
+
+Provides intelligent draft recommendations based on league scoring,
+positional needs, and advanced analytics.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy.orm import Session
-from ..models.player import Player
-from ..models.fantasy import League, FantasyTeam, Roster
-from .player import PlayerService
+import asyncio
 import logging
-from collections import defaultdict
+from typing import Dict, List, Any, Optional, Tuple
+from datetime import datetime
+import math
+from dataclasses import dataclass
+
+from ..models.espn_league import ESPNLeague, DraftSession, DraftRecommendation
+from ..services.ai.claude_client import ai_client
 
 logger = logging.getLogger(__name__)
 
 
-class DraftAssistant:
-    """Provides draft recommendations and analysis"""
+@dataclass
+class PlayerProjection:
+    """Player projection with scoring-adjusted values"""
+    player_id: int
+    name: str
+    position: str
+    team: str
+    projected_points: float
+    std_dev: float
+    adp: float  # Average Draft Position
+    vor: float  # Value Over Replacement
+    tier: int
+    bye_week: int
+
+
+@dataclass
+class PositionalNeed:
+    """Analysis of positional needs for roster construction"""
+    position: str
+    filled_slots: int
+    required_slots: int
+    need_level: float  # 0.0 to 1.0
+    scarcity_factor: float
+    next_tier_dropoff: float
+
+
+@dataclass
+class DraftContext:
+    """Complete context for draft recommendations"""
+    league: ESPNLeague
+    session: DraftSession
+    available_players: List[PlayerProjection]
+    positional_needs: List[PositionalNeed]
+    user_roster: List[Dict[str, Any]]
+    historical_patterns: Optional[Dict[str, Any]] = None
+
+
+class DraftAssistantService:
+    """Core service for generating intelligent draft recommendations"""
     
-    def __init__(self, db: Session, league: League):
-        self.db = db
-        self.league = league
-        self.scoring_type = league.scoring_type
-    
-    def get_draft_recommendations(
+    def __init__(self):
+        self.scoring_multipliers = {}
+        self.position_rankings = {}
+        
+    async def generate_recommendations(
         self, 
-        fantasy_team_id: int, 
-        pick_number: int, 
-        round_number: int
-    ) -> List[Dict[str, Any]]:
-        """Get draft recommendations for a specific pick"""
-        
-        # Get current roster composition
-        roster_needs = self._analyze_roster_needs(fantasy_team_id)
-        
-        # Get available players
-        available_players = self._get_available_players()
-        
-        # Calculate draft values
-        recommendations = []
-        for player in available_players:
-            value_data = self._calculate_draft_value(
-                player, 
-                pick_number, 
-                round_number, 
-                roster_needs
-            )
-            recommendations.append(value_data)
-        
-        # Sort by draft value and return top recommendations
-        recommendations.sort(key=lambda x: x['draft_value'], reverse=True)
-        
-        return recommendations[:20]  # Top 20 recommendations
-    
-    def _analyze_roster_needs(self, fantasy_team_id: int) -> Dict[str, int]:
-        """Analyze current roster and determine positional needs"""
-        current_roster = self.db.query(Roster).filter(
-            Roster.fantasy_team_id == fantasy_team_id,
-            Roster.is_active == True
-        ).all()
-        
-        # Count players by position
-        position_counts = defaultdict(int)
-        for roster_entry in current_roster:
-            if roster_entry.player and roster_entry.player.position:
-                position_counts[roster_entry.player.position] += 1
-        
-        # Calculate needs based on league settings
-        needs = {
-            'QB': max(0, self.league.starting_qb + 1 - position_counts['QB']),
-            'RB': max(0, self.league.starting_rb + 2 - position_counts['RB']),
-            'WR': max(0, self.league.starting_wr + 2 - position_counts['WR']), 
-            'TE': max(0, self.league.starting_te + 1 - position_counts['TE']),
-            'K': max(0, self.league.starting_k + 1 - position_counts['K']),
-            'DEF': max(0, self.league.starting_def + 1 - position_counts['DEF'])
-        }
-        
-        # Add flex considerations
-        flex_spots = self.league.starting_flex
-        skill_position_total = position_counts['RB'] + position_counts['WR'] + position_counts['TE']
-        min_skill_needed = (self.league.starting_rb + self.league.starting_wr + 
-                           self.league.starting_te + flex_spots)
-        
-        if skill_position_total < min_skill_needed:
-            # Prioritize RB and WR for flex
-            needs['RB'] = max(needs['RB'], 1)
-            needs['WR'] = max(needs['WR'], 1)
-        
-        return needs
-    
-    def _get_available_players(self) -> List[Player]:
-        """Get players not already drafted in the league"""
-        # Get all drafted players in this league
-        drafted_player_ids = self.db.query(Roster.player_id).filter(
-            Roster.fantasy_team.has(league_id=self.league.id),
-            Roster.is_active == True
-        ).subquery()
-        
-        # Get available players
-        available = self.db.query(Player).filter(
-            Player.is_active == True,
-            ~Player.id.in_(drafted_player_ids)
-        ).all()
-        
-        return available
-    
-    def _calculate_draft_value(
-        self, 
-        player: Player, 
-        pick_number: int, 
-        round_number: int, 
-        roster_needs: Dict[str, int]
+        session: DraftSession,
+        league: ESPNLeague,
+        available_players: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
-        """Calculate draft value for a player at a specific pick"""
+        """Generate comprehensive draft recommendations"""
         
-        # Base player value
-        base_value = PlayerService.calculate_player_value(
-            self.db, 
-            player.id, 
-            self.scoring_type
+        try:
+            # Build draft context
+            context = await self._build_draft_context(session, league, available_players)
+            
+            # Calculate player values with league scoring
+            scored_players = self._calculate_scoring_adjusted_values(
+                context.available_players, 
+                league.scoring_settings
+            )
+            
+            # Analyze positional needs
+            positional_needs = self._analyze_positional_needs(
+                context.user_roster,
+                league.roster_positions,
+                session.current_round
+            )
+            
+            # Calculate value over replacement
+            vor_rankings = self._calculate_value_over_replacement(
+                scored_players,
+                positional_needs
+            )
+            
+            # Apply draft strategy
+            strategic_recommendations = self._apply_draft_strategy(
+                vor_rankings,
+                positional_needs,
+                session,
+                league
+            )
+            
+            # Generate AI reasoning
+            ai_analysis = await self._generate_ai_reasoning(
+                strategic_recommendations,
+                context,
+                session
+            )
+            
+            return {
+                "recommendations": strategic_recommendations,
+                "ai_analysis": ai_analysis,
+                "positional_needs": positional_needs,
+                "context": {
+                    "pick_number": session.current_pick,
+                    "round": session.current_round,
+                    "next_user_pick": session.get_next_pick_number(),
+                    "picks_until_turn": session.get_picks_until_user_turn()
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating draft recommendations: {e}")
+            return self._generate_fallback_recommendations(session, league)
+    
+    async def _build_draft_context(
+        self,
+        session: DraftSession,
+        league: ESPNLeague,
+        available_players: Optional[List[Dict[str, Any]]]
+    ) -> DraftContext:
+        """Build comprehensive context for draft analysis"""
+        
+        # Get available players (mock data for now)
+        if not available_players:
+            available_players = self._get_mock_available_players()
+        
+        # Convert to PlayerProjection objects
+        player_projections = [
+            PlayerProjection(
+                player_id=p.get('id', 0),
+                name=p.get('name', 'Unknown'),
+                position=p.get('position', 'UNKNOWN'),
+                team=p.get('team', 'UNK'),
+                projected_points=p.get('projected_points', 0.0),
+                std_dev=p.get('std_dev', 0.0),
+                adp=p.get('adp', 999.0),
+                vor=0.0,  # Will be calculated
+                tier=p.get('tier', 1),
+                bye_week=p.get('bye_week', 1)
+            )
+            for p in available_players
+        ]
+        
+        # Analyze positional needs
+        positional_needs = self._analyze_positional_needs(
+            session.user_roster or [],
+            league.roster_positions or {},
+            session.current_round
         )
         
-        # Position need multiplier
-        need_multiplier = self._get_need_multiplier(player.position, roster_needs, round_number)
-        
-        # Value over replacement (VOR)
-        vor_value = self._calculate_vor(player, pick_number)
-        
-        # Positional scarcity adjustment
-        scarcity_multiplier = self._get_scarcity_multiplier(player.position, round_number)
-        
-        # Calculate final draft value
-        draft_value = (base_value + vor_value) * need_multiplier * scarcity_multiplier
-        
-        # Tier analysis
-        tier = self._get_player_tier(player.position, base_value)
-        
-        return {
-            'player': player,
-            'draft_value': round(draft_value, 2),
-            'base_value': round(base_value, 2),
-            'vor_value': round(vor_value, 2),
-            'need_multiplier': round(need_multiplier, 2),
-            'scarcity_multiplier': round(scarcity_multiplier, 2),
-            'tier': tier,
-            'position_rank': self._get_position_rank(player),
-            'recommendation_reason': self._get_recommendation_reason(
-                player, need_multiplier, tier, round_number
-            )
-        }
+        return DraftContext(
+            league=league,
+            session=session,
+            available_players=player_projections,
+            positional_needs=positional_needs,
+            user_roster=session.user_roster or []
+        )
     
-    def _get_need_multiplier(self, position: str, roster_needs: Dict[str, int], round_number: int) -> float:
-        """Calculate need multiplier based on roster composition"""
-        need = roster_needs.get(position, 0)
+    def _calculate_scoring_adjusted_values(
+        self,
+        players: List[PlayerProjection],
+        scoring_settings: Dict[str, Any]
+    ) -> List[PlayerProjection]:
+        """Adjust player values based on league scoring system"""
         
-        if need == 0:
-            return 0.7  # Already filled
-        elif need == 1:
-            return 1.0  # Normal need
-        elif need >= 2:
-            return 1.3  # High need
+        # Extract scoring multipliers
+        multipliers = self._extract_scoring_multipliers(scoring_settings)
         
-        # Late round considerations
-        if round_number > 10:
-            if position in ['K', 'DEF']:
-                return 1.2  # Draft K/DEF late
+        # Apply scoring adjustments
+        for player in players:
+            base_points = player.projected_points
+            
+            # Position-specific adjustments
+            if player.position == 'QB':
+                # 6pt passing TD leagues boost QB value
+                if multipliers.get('passing_tds', 4) >= 6:
+                    player.projected_points *= 1.15
+                    
+            elif player.position in ['RB', 'WR']:
+                # PPR adjustments
+                ppr_value = multipliers.get('receptions', 0)
+                if ppr_value >= 1.0:  # Full PPR
+                    if player.position == 'WR':
+                        player.projected_points *= 1.08
+                    elif player.position == 'RB':
+                        player.projected_points *= 1.05
+                elif ppr_value >= 0.5:  # Half PPR
+                    if player.position == 'WR':
+                        player.projected_points *= 1.04
+                    elif player.position == 'RB':
+                        player.projected_points *= 1.02
+        
+        return players
+    
+    def _analyze_positional_needs(
+        self,
+        user_roster: List[Dict[str, Any]],
+        roster_positions: Dict[str, int],
+        current_round: int
+    ) -> List[PositionalNeed]:
+        """Analyze which positions the user needs to fill"""
+        
+        # Count current roster positions
+        filled_positions = {}
+        for pick in user_roster:
+            pos = pick.get('position', 'UNKNOWN')
+            filled_positions[pos] = filled_positions.get(pos, 0) + 1
+        
+        # Calculate needs for each position
+        needs = []
+        total_slots = sum(roster_positions.values()) if roster_positions else 16
+        
+        for position, required in roster_positions.items():
+            filled = filled_positions.get(position, 0)
+            remaining_slots = max(0, required - filled)
+            
+            # Calculate need level (0.0 to 1.0)
+            if required > 0:
+                need_level = remaining_slots / required
             else:
-                return 0.9  # Prefer skill positions
-        
-        return 1.0
-    
-    def _calculate_vor(self, player: Player, pick_number: int) -> float:
-        """Calculate Value Over Replacement"""
-        # Get baseline replacement level player for position
-        position_players = PlayerService.get_position_rankings(
-            self.db, 
-            player.position, 
-            self.scoring_type, 
-            100
-        )
-        
-        if not position_players:
-            return 0.0
-        
-        # Replacement level varies by position
-        replacement_ranks = {
-            'QB': 15,   # QB15
-            'RB': 36,   # RB36 (3 per team)
-            'WR': 48,   # WR48 (4 per team)
-            'TE': 15,   # TE15
-            'K': 15,    # K15
-            'DEF': 15   # DEF15
-        }
-        
-        replacement_rank = replacement_ranks.get(player.position, 24)
-        
-        if len(position_players) > replacement_rank:
-            replacement_value = position_players[replacement_rank - 1]['value']
-            player_value = PlayerService.calculate_player_value(
-                self.db, 
-                player.id, 
-                self.scoring_type
+                need_level = 0.0
+            
+            # Adjust for draft timing
+            rounds_remaining = 16 - current_round
+            scarcity_factor = self._calculate_positional_scarcity(
+                position, 
+                current_round,
+                rounds_remaining
             )
-            return max(0, player_value - replacement_value)
+            
+            needs.append(PositionalNeed(
+                position=position,
+                filled_slots=filled,
+                required_slots=required,
+                need_level=need_level,
+                scarcity_factor=scarcity_factor,
+                next_tier_dropoff=0.0  # TODO: Calculate tier analysis
+            ))
         
-        return 0.0
+        return sorted(needs, key=lambda x: x.need_level * x.scarcity_factor, reverse=True)
     
-    def _get_scarcity_multiplier(self, position: str, round_number: int) -> float:
-        """Get position scarcity multiplier based on draft round"""
+    def _calculate_value_over_replacement(
+        self,
+        players: List[PlayerProjection],
+        positional_needs: List[PositionalNeed]
+    ) -> List[PlayerProjection]:
+        """Calculate value over replacement for each player"""
         
-        # Early round scarcity (rounds 1-6)
-        if round_number <= 6:
-            scarcity = {
-                'RB': 1.2,   # RB scarcity early
-                'WR': 1.0,   # Balanced
-                'QB': 0.8,   # Wait on QB early
-                'TE': 0.9,   # Some good options
-                'K': 0.5,    # Don't draft early
-                'DEF': 0.5   # Don't draft early
-            }
-        # Mid round (7-12)
-        elif round_number <= 12:
-            scarcity = {
-                'RB': 1.1,
-                'WR': 1.0,
-                'QB': 1.0,
-                'TE': 1.1,   # TE scarcity kicks in
-                'K': 0.7,
-                'DEF': 0.7
-            }
-        # Late round (13+)
-        else:
-            scarcity = {
-                'RB': 1.0,
-                'WR': 1.0,
-                'QB': 1.0,
-                'TE': 1.0,
-                'K': 1.2,    # Time for K/DEF
-                'DEF': 1.2
-            }
+        # Group players by position
+        by_position = {}
+        for player in players:
+            if player.position not in by_position:
+                by_position[player.position] = []
+            by_position[player.position].append(player)
         
-        return scarcity.get(position, 1.0)
+        # Sort each position by projected points
+        for position in by_position:
+            by_position[position].sort(key=lambda x: x.projected_points, reverse=True)
+        
+        # Calculate replacement level for each position
+        replacement_levels = {}
+        for position, pos_players in by_position.items():
+            # Replacement level is typically the player at position 24-30
+            replacement_index = min(len(pos_players) - 1, 30)
+            if replacement_index >= 0:
+                replacement_levels[position] = pos_players[replacement_index].projected_points
+            else:
+                replacement_levels[position] = 0.0
+        
+        # Calculate VOR for each player
+        for player in players:
+            replacement_value = replacement_levels.get(player.position, 0.0)
+            player.vor = max(0.0, player.projected_points - replacement_value)
+        
+        return players
     
-    def _get_player_tier(self, position: str, value: float) -> int:
-        """Determine player tier within position"""
-        # Get all players at position and their values
-        position_rankings = PlayerService.get_position_rankings(
-            self.db, 
-            position, 
-            self.scoring_type, 
-            50
-        )
+    def _apply_draft_strategy(
+        self,
+        players: List[PlayerProjection],
+        positional_needs: List[PositionalNeed],
+        session: DraftSession,
+        league: ESPNLeague
+    ) -> List[Dict[str, Any]]:
+        """Apply strategic considerations to player rankings"""
         
-        # Define tier breakpoints (approximate)
-        if not position_rankings:
-            return 5
+        # Create recommendations list
+        recommendations = []
         
-        sorted_values = [p['value'] for p in position_rankings]
+        # Get top players by VOR
+        sorted_players = sorted(players, key=lambda x: x.vor, reverse=True)
         
-        if position == 'QB':
-            tier_sizes = [3, 6, 6, 9, 26]  # QB tiers
-        elif position in ['RB', 'WR']:
-            tier_sizes = [6, 8, 10, 12, 14]  # RB/WR tiers
-        elif position == 'TE':
-            tier_sizes = [3, 5, 7, 10, 25]  # TE tiers
-        else:
-            tier_sizes = [5, 5, 5, 5, 30]  # K/DEF tiers
+        # Apply strategic filters
+        for player in sorted_players[:20]:  # Top 20 by VOR
+            
+            # Calculate recommendation score
+            base_score = player.vor
+            
+            # Positional need adjustment
+            pos_need = next((n for n in positional_needs if n.position == player.position), None)
+            if pos_need:
+                need_multiplier = 1.0 + (pos_need.need_level * 0.3)
+                scarcity_multiplier = 1.0 + (pos_need.scarcity_factor * 0.2)
+                base_score *= need_multiplier * scarcity_multiplier
+            
+            # Round-specific adjustments
+            if session.current_round <= 3:
+                # Early rounds: prioritize top talent
+                if player.tier <= 2:
+                    base_score *= 1.1
+            elif session.current_round <= 6:
+                # Middle rounds: balance need vs value
+                pass
+            else:
+                # Late rounds: fill needs and look for upside
+                if pos_need and pos_need.need_level > 0.5:
+                    base_score *= 1.15
+            
+            # Bye week considerations (later rounds)
+            if session.current_round > 8:
+                # TODO: Check for bye week clustering
+                pass
+            
+            recommendations.append({
+                "player_id": player.player_id,
+                "name": player.name,
+                "position": player.position,
+                "team": player.team,
+                "projected_points": player.projected_points,
+                "vor": player.vor,
+                "recommendation_score": base_score,
+                "tier": player.tier,
+                "adp": player.adp,
+                "reasoning": self._generate_player_reasoning(player, pos_need, session)
+            })
         
-        # Find which tier the player falls into
-        rank = 1
-        for i, ranking in enumerate(position_rankings):
-            if ranking['value'] <= value:
-                rank = i + 1
-                break
+        # Sort by recommendation score
+        recommendations.sort(key=lambda x: x["recommendation_score"], reverse=True)
         
-        cumulative = 0
-        for tier, size in enumerate(tier_sizes, 1):
-            cumulative += size
-            if rank <= cumulative:
-                return tier
-        
-        return len(tier_sizes)  # Lowest tier
+        return recommendations[:10]  # Return top 10 recommendations
     
-    def _get_position_rank(self, player: Player) -> int:
-        """Get player's rank within their position"""
-        position_rankings = PlayerService.get_position_rankings(
-            self.db, 
-            player.position, 
-            self.scoring_type, 
-            100
-        )
-        
-        for ranking in position_rankings:
-            if ranking['player'].id == player.id:
-                return ranking['rank']
-        
-        return 999  # Not ranked
-    
-    def _get_recommendation_reason(
-        self, 
-        player: Player, 
-        need_multiplier: float, 
-        tier: int, 
-        round_number: int
+    def _generate_player_reasoning(
+        self,
+        player: PlayerProjection,
+        pos_need: Optional[PositionalNeed],
+        session: DraftSession
     ) -> str:
-        """Generate human-readable recommendation reason"""
+        """Generate reasoning for why this player is recommended"""
         
-        position = player.position
         reasons = []
         
-        # Tier-based reasons
-        if tier == 1:
-            reasons.append(f"Elite {position}")
-        elif tier == 2:
-            reasons.append(f"Top-tier {position}")
-        elif tier <= 3:
-            reasons.append(f"Solid {position} option")
+        # VOR reasoning
+        if player.vor > 20:
+            reasons.append("Excellent value over replacement")
+        elif player.vor > 10:
+            reasons.append("Good value over replacement")
         
-        # Need-based reasons
-        if need_multiplier > 1.2:
-            reasons.append(f"High team need at {position}")
-        elif need_multiplier < 0.8:
-            reasons.append(f"Position already filled")
+        # Positional need
+        if pos_need and pos_need.need_level > 0.7:
+            reasons.append(f"Fills critical {player.position} need")
+        elif pos_need and pos_need.need_level > 0.3:
+            reasons.append(f"Addresses {player.position} depth")
         
-        # Round-based reasons
-        if round_number <= 3 and position in ['RB', 'WR']:
-            reasons.append("Core position early")
-        elif round_number > 10 and position in ['K', 'DEF']:
-            reasons.append("Good time for K/DEF")
-        elif round_number <= 6 and position == 'QB':
-            reasons.append("Consider waiting on QB")
+        # Tier considerations
+        if player.tier <= 2:
+            reasons.append("Top-tier talent")
+        elif player.tier <= 4:
+            reasons.append("Solid tier player")
         
-        # Value-based reasons
-        vor = self._calculate_vor(player, round_number * 12)  # Approximate pick
-        if vor > 50:
-            reasons.append("Excellent value")
-        elif vor > 25:
-            reasons.append("Good value")
+        # ADP value
+        if player.adp > session.current_pick + 10:
+            reasons.append("Great value vs ADP")
+        elif player.adp > session.current_pick + 5:
+            reasons.append("Good value vs ADP")
         
-        return "; ".join(reasons) if reasons else f"Solid {position} pick"
+        return "; ".join(reasons) if reasons else "Recommended player"
     
-    def get_draft_board(self, top_n: int = 200) -> List[Dict[str, Any]]:
-        """Get overall draft board rankings"""
-        all_positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
-        all_players = []
+    async def _generate_ai_reasoning(
+        self,
+        recommendations: List[Dict[str, Any]],
+        context: DraftContext,
+        session: DraftSession
+    ) -> Dict[str, Any]:
+        """Generate AI-powered strategic analysis"""
         
-        for position in all_positions:
-            position_rankings = PlayerService.get_position_rankings(
-                self.db, 
-                position, 
-                self.scoring_type, 
-                50
-            )
-            all_players.extend(position_rankings)
-        
-        # Sort by value and assign overall ranks
-        all_players.sort(key=lambda x: x['value'], reverse=True)
-        
-        for i, player_data in enumerate(all_players[:top_n]):
-            player_data['overall_rank'] = i + 1
-        
-        return all_players[:top_n]
-    
-    def analyze_draft_capital(self, fantasy_team_id: int) -> Dict[str, Any]:
-        """Analyze how draft capital was spent"""
-        roster = self.db.query(Roster).filter(
-            Roster.fantasy_team_id == fantasy_team_id,
-            Roster.is_active == True,
-            Roster.draft_round.isnot(None)
-        ).all()
-        
-        analysis = {
-            'total_picks': len(roster),
-            'position_breakdown': defaultdict(list),
-            'round_breakdown': defaultdict(list),
-            'value_analysis': {
-                'total_value': 0,
-                'average_value': 0,
-                'best_pick': None,
-                'worst_pick': None
+        try:
+            # Prepare context for AI
+            ai_context = {
+                "league_info": {
+                    "scoring_type": context.league.get_league_type_description(),
+                    "team_count": context.league.team_count,
+                    "roster_positions": context.league.roster_positions
+                },
+                "draft_state": {
+                    "current_pick": session.current_pick,
+                    "round": session.current_round,
+                    "user_position": session.user_pick_position,
+                    "next_pick": session.get_next_pick_number(),
+                    "picks_until_turn": session.get_picks_until_user_turn()
+                },
+                "roster_analysis": {
+                    "current_picks": session.user_roster,
+                    "positional_needs": [
+                        {
+                            "position": need.position,
+                            "filled": need.filled_slots,
+                            "required": need.required_slots,
+                            "need_level": need.need_level
+                        }
+                        for need in context.positional_needs
+                    ]
+                },
+                "top_recommendations": recommendations[:5]
             }
+            
+            # Generate AI analysis
+            prompt = f"""
+            Analyze this draft situation for pick {session.current_pick} in round {session.current_round}.
+            
+            Provide strategic guidance covering:
+            1. Overall draft strategy for this pick
+            2. Top 3 player recommendations with reasoning
+            3. Positional priorities going forward
+            4. Any red flags or considerations
+            5. Strategy for next few picks
+            
+            Keep analysis concise but insightful.
+            """
+            
+            ai_response = await ai_client.chat_completion(
+                message=prompt,
+                context=ai_context,
+                analysis_type="draft_strategy"
+            )
+            
+            return {
+                "overall_strategy": ai_response.get("response", "Strategic analysis"),
+                "confidence": ai_response.get("confidence", 0.85),
+                "key_insights": self._extract_key_insights(recommendations, context),
+                "next_pick_strategy": self._generate_next_pick_strategy(session, context)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating AI reasoning: {e}")
+            return {
+                "overall_strategy": "Focus on best available player with positional need consideration",
+                "confidence": 0.7,
+                "key_insights": ["Standard draft strategy recommended"],
+                "next_pick_strategy": "Continue building roster depth"
+            }
+    
+    def _extract_key_insights(
+        self,
+        recommendations: List[Dict[str, Any]],
+        context: DraftContext
+    ) -> List[str]:
+        """Extract key insights from the draft analysis"""
+        
+        insights = []
+        
+        # Analyze top recommendation
+        if recommendations:
+            top_rec = recommendations[0]
+            if top_rec["vor"] > 15:
+                insights.append(f"Excellent value available at {top_rec['position']}")
+        
+        # Positional scarcity insights
+        urgent_needs = [n for n in context.positional_needs if n.need_level > 0.7]
+        if urgent_needs:
+            positions = [n.position for n in urgent_needs[:2]]
+            insights.append(f"Urgent needs at {', '.join(positions)}")
+        
+        # Round-specific insights
+        if context.session.current_round <= 3:
+            insights.append("Early round: prioritize elite talent")
+        elif context.session.current_round >= 10:
+            insights.append("Late round: fill roster holes and target upside")
+        
+        return insights
+    
+    def _generate_next_pick_strategy(
+        self,
+        session: DraftSession,
+        context: DraftContext
+    ) -> str:
+        """Generate strategy for upcoming picks"""
+        
+        next_pick = session.get_next_pick_number()
+        picks_away = session.get_picks_until_user_turn()
+        
+        if picks_away <= 3:
+            return "Your next pick is soon - consider backup options"
+        elif picks_away <= 10:
+            return "Monitor position runs and adjust strategy accordingly"
+        else:
+            return "Long wait until next pick - target players likely to be available"
+    
+    def _extract_scoring_multipliers(self, scoring_settings: Dict[str, Any]) -> Dict[str, float]:
+        """Extract scoring multipliers from ESPN settings"""
+        
+        if not scoring_settings:
+            return {
+                'passing_yards': 0.04,
+                'passing_tds': 4.0,
+                'rushing_yards': 0.1,
+                'rushing_tds': 6.0,
+                'receiving_yards': 0.1,
+                'receiving_tds': 6.0,
+                'receptions': 0.0
+            }
+        
+        # ESPN scoring ID mappings
+        return {
+            'passing_yards': scoring_settings.get('16', {}).get('points', 0.04),
+            'passing_tds': scoring_settings.get('4', {}).get('points', 4.0),
+            'passing_ints': scoring_settings.get('20', {}).get('points', -2.0),
+            'rushing_yards': scoring_settings.get('17', {}).get('points', 0.1),
+            'rushing_tds': scoring_settings.get('5', {}).get('points', 6.0),
+            'receiving_yards': scoring_settings.get('18', {}).get('points', 0.1),
+            'receiving_tds': scoring_settings.get('6', {}).get('points', 6.0),
+            'receptions': scoring_settings.get('53', {}).get('points', 0.0),
+        }
+    
+    def _calculate_positional_scarcity(
+        self,
+        position: str,
+        current_round: int,
+        rounds_remaining: int
+    ) -> float:
+        """Calculate positional scarcity factor"""
+        
+        # Position-specific scarcity curves
+        scarcity_curves = {
+            'QB': 0.2,   # Less scarce, can wait
+            'RB': 0.8,   # Most scarce position
+            'WR': 0.6,   # Moderately scarce
+            'TE': 0.4,   # Can find value later
+            'K': 0.1,    # Draft very late
+            'DEF': 0.1   # Draft very late
         }
         
-        values = []
-        for pick in roster:
-            if pick.player:
-                value = PlayerService.calculate_player_value(
-                    self.db, 
-                    pick.player.id, 
-                    self.scoring_type
-                )
-                values.append((pick, value))
-                
-                analysis['position_breakdown'][pick.player.position].append({
-                    'player': pick.player,
-                    'round': pick.draft_round,
-                    'pick': pick.draft_pick,
-                    'value': value
-                })
-                
-                analysis['round_breakdown'][pick.draft_round].append({
-                    'player': pick.player,
-                    'position': pick.player.position,
-                    'value': value
-                })
+        base_scarcity = scarcity_curves.get(position, 0.5)
         
-        if values:
-            total_value = sum(v[1] for v in values)
-            analysis['value_analysis']['total_value'] = round(total_value, 2)
-            analysis['value_analysis']['average_value'] = round(total_value / len(values), 2)
-            
-            # Best and worst picks
-            values.sort(key=lambda x: x[1], reverse=True)
-            analysis['value_analysis']['best_pick'] = {
-                'player': values[0][0].player,
-                'value': values[0][1],
-                'round': values[0][0].draft_round
-            }
-            analysis['value_analysis']['worst_pick'] = {
-                'player': values[-1][0].player,
-                'value': values[-1][1],
-                'round': values[-1][0].draft_round
-            }
+        # Increase scarcity as draft progresses
+        round_multiplier = 1.0 + (current_round / 16.0) * 0.5
         
-        return analysis
+        return min(1.0, base_scarcity * round_multiplier)
+    
+    def _get_mock_available_players(self) -> List[Dict[str, Any]]:
+        """Generate mock available players for testing"""
+        
+        mock_players = [
+            {
+                "id": 1001, "name": "Elite RB1", "position": "RB", "team": "NFL",
+                "projected_points": 280.5, "std_dev": 45.2, "adp": 3.2, "tier": 1, "bye_week": 7
+            },
+            {
+                "id": 1002, "name": "Top WR1", "position": "WR", "team": "NFL", 
+                "projected_points": 265.8, "std_dev": 38.1, "adp": 4.1, "tier": 1, "bye_week": 9
+            },
+            {
+                "id": 1003, "name": "Elite QB1", "position": "QB", "team": "NFL",
+                "projected_points": 285.2, "std_dev": 32.5, "adp": 6.8, "tier": 1, "bye_week": 12
+            },
+            {
+                "id": 1004, "name": "Solid RB2", "position": "RB", "team": "NFL",
+                "projected_points": 215.3, "std_dev": 52.8, "adp": 18.5, "tier": 3, "bye_week": 6
+            },
+            {
+                "id": 1005, "name": "Reliable WR2", "position": "WR", "team": "NFL",
+                "projected_points": 195.7, "std_dev": 41.2, "adp": 22.1, "tier": 3, "bye_week": 11
+            }
+        ]
+        
+        return mock_players
+    
+    def _generate_fallback_recommendations(
+        self,
+        session: DraftSession,
+        league: ESPNLeague
+    ) -> Dict[str, Any]:
+        """Generate basic recommendations when main algorithm fails"""
+        
+        return {
+            "recommendations": [
+                {
+                    "player_id": 9999,
+                    "name": "Best Available Player",
+                    "position": "FLEX",
+                    "team": "NFL",
+                    "projected_points": 150.0,
+                    "vor": 10.0,
+                    "recommendation_score": 85.0,
+                    "tier": 2,
+                    "adp": session.current_pick,
+                    "reasoning": "Fallback recommendation - draft best available"
+                }
+            ],
+            "ai_analysis": {
+                "overall_strategy": "Focus on best available player",
+                "confidence": 0.5,
+                "key_insights": ["System temporarily using simplified recommendations"],
+                "next_pick_strategy": "Continue with best available approach"
+            },
+            "context": {
+                "pick_number": session.current_pick,
+                "round": session.current_round
+            }
+        }
+
+
+# Global service instance
+draft_assistant = DraftAssistantService()

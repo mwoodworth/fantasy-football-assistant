@@ -6,6 +6,13 @@ from .database import Base, engine, SessionLocal, get_db
 from .user import User
 from .player import Player, PlayerStats, Team
 from .fantasy import League, FantasyTeam, Roster, Trade, WaiverClaim
+from .espn_league import (
+    ESPNLeague, 
+    DraftSession, 
+    DraftRecommendation, 
+    LeagueHistoricalData, 
+    UserLeagueSettings
+)
 
 __all__ = [
     "Base",
@@ -20,5 +27,10 @@ __all__ = [
     "FantasyTeam",
     "Roster",
     "Trade",
-    "WaiverClaim"
+    "WaiverClaim",
+    "ESPNLeague",
+    "DraftSession",
+    "DraftRecommendation", 
+    "LeagueHistoricalData",
+    "UserLeagueSettings"
 ]

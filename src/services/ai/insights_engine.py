@@ -14,10 +14,6 @@ import json
 from .claude_client import ai_client
 from .ml_pipeline import ml_pipeline
 from ..player import PlayerService
-from ..draft_assistant import DraftAssistant
-from ..trade_analyzer import TradeAnalyzer
-from ..waiver_analyzer import WaiverAnalyzer
-from ..lineup_optimizer import LineupOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -30,12 +26,20 @@ class InsightsEngine:
         self.ai_client = ai_client
         self.ml_pipeline = ml_pipeline
         
-        # Service instances will be injected when needed
+        # Service instances will be lazy-loaded to avoid circular imports
+        self._draft_assistant = None
+        self._trade_analyzer = None
+        self._waiver_analyzer = None
+        self._lineup_optimizer = None
         self.player_service = None
-        self.draft_assistant = None
-        self.trade_analyzer = None
-        self.waiver_analyzer = None
-        self.lineup_optimizer = None
+    
+    @property
+    def draft_assistant(self):
+        """Lazy load draft assistant to avoid circular imports"""
+        if self._draft_assistant is None:
+            from ..draft_assistant import draft_assistant
+            self._draft_assistant = draft_assistant
+        return self._draft_assistant
     
     async def generate_weekly_report(
         self, 
