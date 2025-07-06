@@ -8,10 +8,12 @@ import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
 import { ConnectLeagueForm } from '../components/espn/ConnectLeagueForm';
 import { DraftSessionModal } from '../components/espn/DraftSessionModal';
+import { LeagueSettingsModal } from '../components/espn/LeagueSettingsModal';
 
 export function ESPNLeaguesPage() {
   const [showConnectModal, setShowConnectModal] = useState(false);
   const [showDraftModal, setShowDraftModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedLeague, setSelectedLeague] = useState<ESPNLeague | null>(null);
   const [includeArchived, setIncludeArchived] = useState(false);
   const queryClient = useQueryClient();
@@ -39,6 +41,11 @@ export function ESPNLeaguesPage() {
   const handleStartDraft = (league: ESPNLeague) => {
     setSelectedLeague(league);
     setShowDraftModal(true);
+  };
+
+  const handleShowSettings = (league: ESPNLeague) => {
+    setSelectedLeague(league);
+    setShowSettingsModal(true);
   };
 
   const getSyncStatusBadge = (status: string) => {
@@ -161,6 +168,7 @@ export function ESPNLeaguesPage() {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => handleShowSettings(league)}
                   className="flex items-center gap-1"
                 >
                   <Settings className="h-3 w-3" />
@@ -205,6 +213,18 @@ export function ESPNLeaguesPage() {
           isOpen={showDraftModal}
           onClose={() => {
             setShowDraftModal(false);
+            setSelectedLeague(null);
+          }}
+          league={selectedLeague}
+        />
+      )}
+
+      {/* League Settings Modal */}
+      {selectedLeague && (
+        <LeagueSettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => {
+            setShowSettingsModal(false);
             setSelectedLeague(null);
           }}
           league={selectedLeague}
