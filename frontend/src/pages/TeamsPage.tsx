@@ -4,7 +4,8 @@ import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Select } from '../components/common/Select';
-import { Users, Trophy, TrendingUp, Settings, Star, ArrowUpDown } from 'lucide-react';
+import { Modal, ModalBody, ModalFooter } from '../components/common/Modal';
+import { Users, Trophy, TrendingUp, Settings, Star, ArrowUpDown, Bell, Shield, Eye } from 'lucide-react';
 
 // Mock team data
 const mockTeams = [
@@ -42,6 +43,7 @@ const mockRoster = [
 export function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState('1');
   const [selectedView, setSelectedView] = useState('roster');
+  const [showSettings, setShowSettings] = useState(false);
 
   const teamOptions = mockTeams.map(team => ({
     value: team.id.toString(),
@@ -124,7 +126,7 @@ export function TeamsPage() {
             onChange={(value) => setSelectedTeam(value as string)}
             className="min-w-[200px]"
           />
-          <Button size="sm" variant="outline">
+          <Button size="sm" variant="outline" onClick={() => setShowSettings(true)}>
             <Settings className="w-4 h-4 mr-2" />
             Settings
           </Button>
@@ -271,6 +273,118 @@ export function TeamsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Settings Modal */}
+      <Modal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Team Settings"
+        size="md"
+      >
+        <ModalBody>
+          <div className="space-y-6">
+            {/* Notifications */}
+            <div>
+              <h3 className="flex items-center text-lg font-medium text-gray-900 mb-4">
+                <Bell className="w-5 h-5 mr-2" />
+                Notifications
+              </h3>
+              <div className="space-y-3">
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Trade offers</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Lineup reminders</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Injury updates</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Waiver results</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+              </div>
+            </div>
+
+            {/* Privacy */}
+            <div>
+              <h3 className="flex items-center text-lg font-medium text-gray-900 mb-4">
+                <Shield className="w-5 h-5 mr-2" />
+                Privacy
+              </h3>
+              <div className="space-y-3">
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Show team in public leagues</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Allow trade offers from anyone</span>
+                  <input type="checkbox" className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+              </div>
+            </div>
+
+            {/* Display */}
+            <div>
+              <h3 className="flex items-center text-lg font-medium text-gray-900 mb-4">
+                <Eye className="w-5 h-5 mr-2" />
+                Display
+              </h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm text-gray-700 mb-2">Default view</label>
+                  <Select
+                    options={viewOptions}
+                    value={selectedView}
+                    onChange={(value) => setSelectedView(value as string)}
+                    className="w-full"
+                  />
+                </div>
+                <label className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Show player photos</span>
+                  <input type="checkbox" defaultChecked className="h-4 w-4 text-blue-600 rounded" />
+                </label>
+              </div>
+            </div>
+
+            {/* Team Info */}
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Team Information</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Team Name</label>
+                  <input
+                    type="text"
+                    defaultValue={currentTeam?.name}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Team Logo URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://example.com/logo.png"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <div className="flex justify-end space-x-3">
+            <Button variant="outline" onClick={() => setShowSettings(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => setShowSettings(false)}>
+              Save Settings
+            </Button>
+          </div>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

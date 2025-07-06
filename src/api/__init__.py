@@ -7,11 +7,13 @@ from .players import router as players_router
 from .fantasy import router as fantasy_router
 from .espn import router as espn_router
 from .ai import router as ai_router
+from .dashboard import router as dashboard_router
 
 __all__ = [
     "auth_router",
     "players_router", 
     "fantasy_router",
     "espn_router",
-    "ai_router"
+    "ai_router",
+    "dashboard_router"
 ]
