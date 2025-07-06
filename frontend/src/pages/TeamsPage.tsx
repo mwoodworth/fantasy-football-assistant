@@ -1,35 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Select } from '../components/common/Select';
 import { Modal, ModalBody, ModalFooter } from '../components/common/Modal';
-import { Users, Trophy, TrendingUp, Settings, Star, ArrowUpDown, Bell, Shield, Eye } from 'lucide-react';
-
-// Mock team data
-const mockTeams = [
-  {
-    id: 1,
-    name: 'Thunder Bolts',
-    league: 'Championship League',
-    record: '8-5',
-    points: 1247.8,
-    rank: 2,
-    playoffs: true,
-    active: true
-  },
-  {
-    id: 2,
-    name: 'Fantasy Kings',
-    league: 'Friends League',
-    record: '6-7',
-    points: 1189.3,
-    rank: 7,
-    playoffs: false,
-    active: true
-  }
-];
+import { Users, Trophy, TrendingUp, Settings, Star, ArrowUpDown, Bell, Shield, Eye, Play, RefreshCw } from 'lucide-react';
+import { teamsService } from '../services/teams';
 
 const mockRoster = [
   { id: 1, name: 'Josh Allen', position: 'QB', team: 'BUF', status: 'starter', points: 287.4 },
@@ -41,13 +20,27 @@ const mockRoster = [
 ];
 
 export function TeamsPage() {
-  const [selectedTeam, setSelectedTeam] = useState('1');
+  const navigate = useNavigate();
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedView, setSelectedView] = useState('roster');
   const [showSettings, setShowSettings] = useState(false);
 
-  const teamOptions = mockTeams.map(team => ({
-    value: team.id.toString(),
-    label: `${team.name} (${team.league})`
+  // Fetch teams from API
+  const { data: teams = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['user-teams'],
+    queryFn: () => teamsService.getUserTeams(),
+  });
+
+  // Set initial selected team when teams load
+  useEffect(() => {
+    if (teams.length > 0 && !selectedTeam) {
+      setSelectedTeam(teams[0].id);
+    }
+  }, [teams, selectedTeam]);
+
+  const teamOptions = teams.map(team => ({
+    ...teamsService.formatTeamOption(team),
+    value: team.id
   }));
 
   const viewOptions = [
@@ -57,7 +50,24 @@ export function TeamsPage() {
     { value: 'waivers', label: 'Waivers' }
   ];
 
-  const currentTeam = mockTeams.find(team => team.id.toString() === selectedTeam);
+  const currentTeam = teams.find(team => team.id === selectedTeam);
+
+  const handleStartDraft = () => {
+    if (currentTeam && currentTeam.platform === 'ESPN' && currentTeam.espn_league_id) {
+      navigate('/espn/leagues');
+    }
+  };
+
+  const handleSyncTeam = async () => {
+    if (currentTeam && currentTeam.platform === 'ESPN') {
+      try {
+        await teamsService.syncTeam(currentTeam.id);
+        refetch();
+      } catch (error) {
+        console.error('Error syncing team:', error);
+      }
+    }
+  };
 
   const rosterColumns = [
     {
@@ -110,6 +120,37 @@ export function TeamsPage() {
     }
   ];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading your teams...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600 p-4">
+        Error loading teams. Please try again.
+      </div>
+    );
+  }
+
+  if (teams.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Trophy className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No teams found</h3>
+        <p className="text-gray-600 mb-4">
+          Connect your ESPN league or create a manual team to get started.
+        </p>
+        <Button onClick={() => navigate('/espn/leagues')}>
+          Connect ESPN League
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -124,7 +165,8 @@ export function TeamsPage() {
             options={teamOptions}
             value={selectedTeam}
             onChange={(value) => setSelectedTeam(value as string)}
-            className="min-w-[200px]"
+            className="min-w-[250px]"
+            searchable
           />
           <Button size="sm" variant="outline" onClick={() => setShowSettings(true)}>
             <Settings className="w-4 h-4 mr-2" />
@@ -135,14 +177,49 @@ export function TeamsPage() {
 
       {/* Team Overview */}
       {currentTeam && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6 text-center">
-              <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
-              <div className="text-2xl font-bold text-gray-900">#{currentTeam.rank}</div>
-              <div className="text-sm text-gray-600">League Rank</div>
-            </CardContent>
-          </Card>
+        <>
+          {/* Platform and League Info */}
+          <div className="bg-gray-50 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className={`text-2xl ${teamsService.getPlatformColor(currentTeam.platform)}`}>
+                {teamsService.getTeamIcon(currentTeam.platform)}
+              </span>
+              <div>
+                <h2 className="font-semibold text-gray-900">{currentTeam.name}</h2>
+                <p className="text-sm text-gray-600">
+                  {currentTeam.league} • {currentTeam.platform} League
+                  {currentTeam.season && ` • ${currentTeam.season} Season`}
+                </p>
+              </div>
+            </div>
+            
+            {/* Platform-specific actions */}
+            <div className="flex items-center gap-2">
+              {currentTeam.platform === 'ESPN' && (
+                <>
+                  {!currentTeam.draft_completed && (
+                    <Button size="sm" onClick={handleStartDraft}>
+                      <Play className="w-4 h-4 mr-1" />
+                      Go to Draft
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={handleSyncTeam}>
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Sync
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-600" />
+                <div className="text-2xl font-bold text-gray-900">#{currentTeam.rank}</div>
+                <div className="text-sm text-gray-600">League Rank</div>
+              </CardContent>
+            </Card>
           
           <Card>
             <CardContent className="p-6 text-center">
@@ -176,6 +253,7 @@ export function TeamsPage() {
             </CardContent>
           </Card>
         </div>
+        </>
       )}
 
       {/* Team Management Tabs */}
