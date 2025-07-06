@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { TrendingUp, Users, Trophy, AlertCircle, RefreshCw, Clock, TrendingDown, Star } from 'lucide-react';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
-import { PlayerService } from '../services/players';
 import { DashboardService } from '../services/dashboard';
 import { LiveScoreTicker } from '../components/dashboard/LiveScoreTicker';
 import { TopPerformersWidget } from '../components/dashboard/TopPerformersWidget';
@@ -26,19 +25,19 @@ export function DashboardPage() {
 
   const { data: topPerformers } = useQuery({
     queryKey: ['topPerformers'],
-    queryFn: () => PlayerService.getTopPerformers(),
+    queryFn: () => DashboardService.getTopPerformers(),
     refetchInterval: autoRefresh ? 60000 : false,
   });
 
   const { data: trendingPlayers } = useQuery({
     queryKey: ['trendingPlayers'],
-    queryFn: () => PlayerService.getTrendingPlayers('up'),
+    queryFn: () => DashboardService.getTrendingPlayers(),
     refetchInterval: autoRefresh ? 120000 : false,
   });
 
   const { data: waiverTargets } = useQuery({
     queryKey: ['waiverTargets'],
-    queryFn: () => PlayerService.getWaiverTargets(),
+    queryFn: () => DashboardService.getWaiverTargets(),
     refetchInterval: autoRefresh ? 300000 : false,
   });
 
