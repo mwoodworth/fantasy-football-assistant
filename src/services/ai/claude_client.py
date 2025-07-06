@@ -191,6 +191,13 @@ Provide:
             return {
                 "response": "AI features are not available - Anthropic API key not configured",
                 "confidence": 0.0,
+                "conversation_id": conversation_id,
+                "analysis_type": analysis_type,
+                "timestamp": datetime.now().isoformat(),
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0
+                },
                 "error": "api_not_configured"
             }
         
@@ -207,17 +214,28 @@ Provide:
             # Get appropriate system prompt
             system_prompt = self.system_prompts.get(analysis_type, self.system_prompts["general"])
             
-            # Make API call to Claude
-            response = await self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=2000,
-                temperature=0.1,
-                system=system_prompt,
-                messages=messages
-            )
-            
-            # Extract response text
-            response_text = response.content[0].text if response.content else "No response generated"
+            # For development/testing without API key, return mock response
+            if not self.client or not hasattr(self.client, 'messages'):
+                logger.warning("Anthropic client not properly initialized - returning mock response")
+                response_text = self._generate_mock_response(message, analysis_type)
+                confidence = 0.85
+                usage = {"input_tokens": 0, "output_tokens": 0}
+            else:
+                # Make API call to Claude
+                response = await self.client.messages.create(
+                    model="claude-3-5-sonnet-20241022",
+                    max_tokens=2000,
+                    temperature=0.1,
+                    system=system_prompt,
+                    messages=messages
+                )
+                response_text = response.content[0].text if response.content else "No response generated"
+                # Calculate confidence based on response characteristics
+                confidence = self._calculate_response_confidence(response_text, context)
+                usage = {
+                    "input_tokens": response.usage.input_tokens if hasattr(response, 'usage') else 0,
+                    "output_tokens": response.usage.output_tokens if hasattr(response, 'usage') else 0
+                }
             
             # Store conversation history
             if conversation_id:
@@ -232,19 +250,13 @@ Provide:
                 if len(self.conversations[conversation_id]) > 20:
                     self.conversations[conversation_id] = self.conversations[conversation_id][-20:]
             
-            # Calculate confidence based on response characteristics
-            confidence = self._calculate_response_confidence(response_text, context)
-            
             return {
                 "response": response_text,
                 "confidence": confidence,
                 "conversation_id": conversation_id,
                 "analysis_type": analysis_type,
                 "timestamp": datetime.now().isoformat(),
-                "usage": {
-                    "input_tokens": response.usage.input_tokens if hasattr(response, 'usage') else 0,
-                    "output_tokens": response.usage.output_tokens if hasattr(response, 'usage') else 0
-                }
+                "usage": usage
             }
             
         except Exception as e:
@@ -252,6 +264,13 @@ Provide:
             return {
                 "response": f"Sorry, I encountered an error processing your request: {str(e)}",
                 "confidence": 0.0,
+                "conversation_id": conversation_id,
+                "analysis_type": analysis_type,
+                "timestamp": datetime.now().isoformat(),
+                "usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0
+                },
                 "error": "api_error",
                 "error_details": str(e)
             }
@@ -439,6 +458,18 @@ Focus on actionable advice that can improve the team's chances of winning.
             "exists": True,
             "last_interaction": messages[-1]["content"][:100] + "..." if messages else None
         }
+
+    def _generate_mock_response(self, message: str, analysis_type: str) -> str:
+        """Generate mock response for development/testing"""
+        mock_responses = {
+            "general": f"I understand you're asking about: {message[:50]}... Based on current fantasy football trends, I would recommend considering factors like recent performance, matchups, and injury reports. This is a mock response for development purposes.",
+            "player_analysis": f"Analyzing player based on your query: {message[:50]}... Key factors to consider include recent usage, target share, and upcoming matchups. This is a mock response for development purposes.",
+            "trade_analysis": f"Evaluating trade scenario: {message[:50]}... Consider player values, team needs, and rest-of-season outlook. This is a mock response for development purposes.",
+            "draft_strategy": f"Draft strategy for: {message[:50]}... Focus on value-based drafting and positional scarcity. This is a mock response for development purposes.",
+            "lineup_optimization": f"Optimizing lineup based on: {message[:50]}... Consider matchups and projected points. This is a mock response for development purposes."
+        }
+        
+        return mock_responses.get(analysis_type, mock_responses["general"])
 
 
 # Global AI client instance
