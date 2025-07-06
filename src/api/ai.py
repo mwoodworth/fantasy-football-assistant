@@ -25,6 +25,7 @@ from ..services.ai.recommendation_engine import recommendation_engine
 from ..services.ai.weekly_report_generator import weekly_report_generator
 from ..services.ai.analytics_dashboard import analytics_dashboard, AnalyticsTimeframe
 from ..services.ai.injury_predictor import injury_predictor, InjuryRiskLevel
+from ..services.ai.breakout_detector import breakout_detector, BreakoutLikelihood
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,23 @@ class InjuryHistoryRequest(BaseModel):
     player_id: int = Field(..., description="Player ID")
     include_predictions: bool = Field(True, description="Include future injury risk predictions")
     timeframe_weeks: int = Field(52, ge=1, le=104, description="Weeks of history to analyze")
+
+class BreakoutPredictionRequest(BaseModel):
+    player_id: int = Field(..., description="Player ID to analyze for breakout potential")
+    player_data: Dict[str, Any] = Field(..., description="Current player data (age, position, usage, performance, etc.)")
+    historical_data: Optional[Dict[str, Any]] = Field(None, description="Historical performance data")
+    team_changes: Optional[Dict[str, Any]] = Field(None, description="Team situation changes (coaching, scheme, etc.)")
+    include_projections: bool = Field(True, description="Include performance projections")
+
+class BreakoutCandidatesRequest(BaseModel):
+    player_list: List[Dict[str, Any]] = Field(..., min_items=1, max_items=100, description="List of players to analyze")
+    min_probability: float = Field(0.4, ge=0.0, le=1.0, description="Minimum breakout probability threshold")
+    max_candidates: int = Field(20, ge=1, le=50, description="Maximum number of candidates to return")
+    position_filter: Optional[str] = Field(None, description="Filter by position (QB, RB, WR, TE)")
+
+class BreakoutComparisionRequest(BaseModel):
+    player_ids: List[int] = Field(..., min_items=2, max_items=10, description="Player IDs to compare")
+    comparison_metrics: List[str] = Field(default=["breakout_probability", "opportunity_score", "efficiency_trend"], description="Metrics to compare")
 
 class TeamAnalyticsRequest(BaseModel):
     team_id: int = Field(..., description="Team ID to analyze")
@@ -1958,6 +1976,367 @@ async def analyze_injury_history(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to analyze injury history: {str(e)}"
+        )
+
+
+# Breakout Prediction Endpoints
+
+@router.post("/breakout/predict")
+async def predict_player_breakout(
+    breakout_request: BreakoutPredictionRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Predict breakout potential for a specific player
+    
+    Analyzes multiple factors to determine breakout probability including:
+    - Opportunity changes (target share, snap count, role evolution)
+    - Performance trends and efficiency metrics  
+    - Team situation changes (coaching, scheme, injuries)
+    - Historical breakout patterns and player development curves
+    - Advanced metrics and underlying statistics
+    
+    Returns comprehensive breakout assessment with projections.
+    """
+    try:
+        logger.info(f"Breakout prediction request for player {breakout_request.player_id} by user {current_user.id}")
+        
+        # Get breakout prediction
+        prediction = await breakout_detector.predict_player_breakout(
+            player_id=breakout_request.player_id,
+            player_data=breakout_request.player_data,
+            historical_data=breakout_request.historical_data,
+            team_changes=breakout_request.team_changes
+        )
+        
+        # Convert prediction to JSON-serializable format
+        prediction_dict = {
+            "player_id": prediction.player_id,
+            "player_name": prediction.player_name,
+            "position": prediction.position,
+            "age": prediction.age,
+            "breakout_probability": prediction.breakout_probability,
+            "breakout_likelihood": prediction.breakout_likelihood.value,
+            "confidence": prediction.confidence,
+            "breakout_types": {
+                bt.value: prob for bt, prob in prediction.breakout_types.items()
+            },
+            "primary_breakout_type": prediction.primary_breakout_type.value,
+            "opportunity_score": prediction.opportunity_score,
+            "efficiency_trend": prediction.efficiency_trend,
+            "situation_change_score": prediction.situation_change_score,
+            "key_indicators": prediction.key_indicators,
+            "supporting_metrics": prediction.supporting_metrics,
+            "risk_factors": prediction.risk_factors,
+            "prediction_date": prediction.prediction_date.isoformat(),
+            "model_version": prediction.model_version,
+            "historical_comparisons": prediction.historical_comparisons
+        }
+        
+        # Add projections if requested
+        if breakout_request.include_projections:
+            prediction_dict.update({
+                "projected_points_increase": prediction.projected_points_increase,
+                "projected_rank_improvement": prediction.projected_rank_improvement,
+                "ceiling_scenario": prediction.ceiling_scenario,
+                "floor_scenario": prediction.floor_scenario
+            })
+        
+        return {
+            "success": True,
+            "data": prediction_dict,
+            "meta": {
+                "prediction_type": "breakout_potential",
+                "player_id": breakout_request.player_id,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat(),
+                "includes_projections": breakout_request.include_projections
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Breakout prediction error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to predict breakout potential: {str(e)}"
+        )
+
+
+@router.post("/breakout/candidates")
+async def get_breakout_candidates(
+    candidates_request: BreakoutCandidatesRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Identify top breakout candidates from player list
+    
+    Analyzes multiple players to find those with highest breakout potential.
+    Useful for:
+    - Waiver wire targets
+    - Draft sleepers identification
+    - Trade opportunity analysis
+    - Roster construction planning
+    """
+    try:
+        logger.info(f"Breakout candidates request for {len(candidates_request.player_list)} players by user {current_user.id}")
+        
+        # Filter by position if specified
+        player_list = candidates_request.player_list
+        if candidates_request.position_filter:
+            player_list = [p for p in player_list if p.get('position') == candidates_request.position_filter]
+        
+        # Get breakout candidates
+        candidates = await breakout_detector.get_breakout_candidates(
+            player_list=player_list,
+            min_probability=candidates_request.min_probability,
+            max_candidates=candidates_request.max_candidates
+        )
+        
+        # Format candidate data
+        formatted_candidates = []
+        for candidate in candidates:
+            formatted_candidates.append({
+                "player_id": candidate.player_id,
+                "player_name": candidate.player_name,
+                "position": candidate.position,
+                "age": candidate.age,
+                "breakout_probability": candidate.breakout_probability,
+                "breakout_likelihood": candidate.breakout_likelihood.value,
+                "confidence": candidate.confidence,
+                "primary_breakout_type": candidate.primary_breakout_type.value,
+                "opportunity_score": candidate.opportunity_score,
+                "key_indicators": candidate.key_indicators[:3],  # Top 3 indicators
+                "projected_points_increase": candidate.projected_points_increase,
+                "ceiling_scenario": candidate.ceiling_scenario
+            })
+        
+        # Calculate summary statistics
+        if candidates:
+            avg_probability = np.mean([c.breakout_probability for c in candidates])
+            avg_opportunity = np.mean([c.opportunity_score for c in candidates])
+            position_breakdown = {}
+            for candidate in candidates:
+                pos = candidate.position
+                position_breakdown[pos] = position_breakdown.get(pos, 0) + 1
+        else:
+            avg_probability = 0.0
+            avg_opportunity = 0.0
+            position_breakdown = {}
+        
+        return {
+            "success": True,
+            "data": {
+                "candidates": formatted_candidates,
+                "summary": {
+                    "total_candidates": len(formatted_candidates),
+                    "avg_breakout_probability": avg_probability,
+                    "avg_opportunity_score": avg_opportunity,
+                    "position_breakdown": position_breakdown,
+                    "min_probability_threshold": candidates_request.min_probability
+                },
+                "filters": {
+                    "position_filter": candidates_request.position_filter,
+                    "players_analyzed": len(player_list),
+                    "max_candidates": candidates_request.max_candidates
+                }
+            },
+            "meta": {
+                "analysis_type": "breakout_candidates",
+                "players_analyzed": len(player_list),
+                "candidates_found": len(formatted_candidates),
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Breakout candidates error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get breakout candidates: {str(e)}"
+        )
+
+
+@router.post("/breakout/compare")
+async def compare_breakout_potential(
+    comparison_request: BreakoutComparisionRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Compare breakout potential between multiple players
+    
+    Provides side-by-side comparison of breakout metrics for 2-10 players.
+    Useful for:
+    - Draft decision making
+    - Trade evaluation
+    - Waiver priority setting
+    - Roster optimization
+    """
+    try:
+        logger.info(f"Breakout comparison for {len(comparison_request.player_ids)} players by user {current_user.id}")
+        
+        # Get predictions for all players
+        comparisons = []
+        for player_id in comparison_request.player_ids:
+            # Mock player data - would come from database
+            player_data = {
+                "id": player_id,
+                "name": f"Player {player_id}",
+                "position": "RB",  # Would be from database
+                "age": 24,
+                "points_per_game": 10.0
+            }
+            
+            prediction = await breakout_detector.predict_player_breakout(player_id, player_data)
+            
+            # Extract requested metrics
+            comparison_data = {
+                "player_id": prediction.player_id,
+                "player_name": prediction.player_name,
+                "position": prediction.position,
+                "age": prediction.age
+            }
+            
+            # Add requested comparison metrics
+            for metric in comparison_request.comparison_metrics:
+                if metric == "breakout_probability":
+                    comparison_data[metric] = prediction.breakout_probability
+                elif metric == "opportunity_score":
+                    comparison_data[metric] = prediction.opportunity_score
+                elif metric == "efficiency_trend":
+                    comparison_data[metric] = prediction.efficiency_trend
+                elif metric == "confidence":
+                    comparison_data[metric] = prediction.confidence
+                elif metric == "projected_points_increase":
+                    comparison_data[metric] = prediction.projected_points_increase
+                elif metric == "primary_breakout_type":
+                    comparison_data[metric] = prediction.primary_breakout_type.value
+                else:
+                    # Default to supporting metrics
+                    comparison_data[metric] = prediction.supporting_metrics.get(metric, 0.0)
+            
+            comparisons.append(comparison_data)
+        
+        # Rank players by breakout probability
+        comparisons.sort(key=lambda x: x.get("breakout_probability", 0), reverse=True)
+        
+        # Add rankings
+        for i, comp in enumerate(comparisons):
+            comp["breakout_rank"] = i + 1
+        
+        # Calculate comparison insights
+        insights = []
+        if len(comparisons) >= 2:
+            top_candidate = comparisons[0]
+            insights.append(f"{top_candidate['player_name']} has the highest breakout probability ({top_candidate.get('breakout_probability', 0):.1%})")
+            
+            if len(comparisons) >= 3:
+                prob_range = comparisons[0].get('breakout_probability', 0) - comparisons[-1].get('breakout_probability', 0)
+                if prob_range > 0.3:
+                    insights.append("Significant variation in breakout potential across players")
+                else:
+                    insights.append("Similar breakout probabilities - other factors may be decisive")
+        
+        return {
+            "success": True,
+            "data": {
+                "comparisons": comparisons,
+                "insights": insights,
+                "comparison_metrics": comparison_request.comparison_metrics,
+                "ranking_basis": "breakout_probability"
+            },
+            "meta": {
+                "comparison_type": "breakout_potential",
+                "players_compared": len(comparison_request.player_ids),
+                "metrics_analyzed": len(comparison_request.comparison_metrics),
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Breakout comparison error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to compare breakout potential: {str(e)}"
+        )
+
+
+@router.get("/breakout/likelihood-levels")
+async def get_breakout_likelihood_levels(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get available breakout likelihood levels and their descriptions
+    
+    Returns all supported likelihood levels with probability ranges and 
+    strategic implications for each level.
+    """
+    try:
+        likelihood_levels = {
+            "very_low": {
+                "probability_range": "0% - 10%",
+                "description": "Minimal breakout potential",
+                "color": "red",
+                "strategy": "Avoid or use as deep bench/handcuff only",
+                "examples": "Aging veterans with declining opportunity"
+            },
+            "low": {
+                "probability_range": "10% - 25%",
+                "description": "Below average breakout potential", 
+                "color": "orange",
+                "strategy": "Late round flier or waiver consideration",
+                "examples": "Players in crowded backfields/WR rooms"
+            },
+            "moderate": {
+                "probability_range": "25% - 45%",
+                "description": "Average breakout potential",
+                "color": "yellow",
+                "strategy": "Middle round target with upside",
+                "examples": "Second-year players with some opportunity"
+            },
+            "high": {
+                "probability_range": "45% - 70%",
+                "description": "Strong breakout potential",
+                "color": "lightgreen", 
+                "strategy": "Priority draft target or waiver claim",
+                "examples": "Players with clear opportunity increase"
+            },
+            "very_high": {
+                "probability_range": "70% - 85%",
+                "description": "Very strong breakout potential",
+                "color": "green",
+                "strategy": "High priority target, draft early",
+                "examples": "Players with multiple breakout indicators"
+            },
+            "elite": {
+                "probability_range": "85% - 100%",
+                "description": "Elite breakout potential",
+                "color": "darkgreen",
+                "strategy": "Must-have player, pay premium if needed",
+                "examples": "Perfect storm of opportunity and talent"
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "likelihood_levels": likelihood_levels,
+                "total_levels": len(likelihood_levels),
+                "probability_range": "0% - 100%",
+                "usage_note": "Higher levels indicate stronger conviction in breakout potential"
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get likelihood levels error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get likelihood levels: {str(e)}"
         )
 
 
