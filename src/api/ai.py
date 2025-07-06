@@ -26,6 +26,8 @@ from ..services.ai.weekly_report_generator import weekly_report_generator
 from ..services.ai.analytics_dashboard import analytics_dashboard, AnalyticsTimeframe
 from ..services.ai.injury_predictor import injury_predictor, InjuryRiskLevel
 from ..services.ai.breakout_detector import breakout_detector, BreakoutLikelihood
+from ..services.ai.game_script_predictor import game_script_predictor
+from ..services.ai.expert_simulator import expert_simulator
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,19 @@ class PlayerAnalyticsRequest(BaseModel):
     player_id: int = Field(..., description="Player ID to analyze")
     timeframe: str = Field("season", description="Timeframe for analysis (current_week, last_4_weeks, season, last_season, career)")
     comparison_players: Optional[List[int]] = Field(None, description="Player IDs to compare against")
+
+class GameScriptPredictionRequest(BaseModel):
+    home_team: str = Field(..., description="Home team name")
+    away_team: str = Field(..., description="Away team name") 
+    week: int = Field(..., ge=1, le=18, description="NFL week number")
+    game_context: Dict[str, Any] = Field(..., description="Game context (spread, total, weather, etc.)")
+    team_tendencies: Optional[Dict[str, Any]] = Field(None, description="Team offensive/defensive tendencies")
+
+class ExpertSimulationRequest(BaseModel):
+    decision_context: Dict[str, Any] = Field(..., description="Fantasy decision context")
+    expert_types: Optional[List[str]] = Field(None, description="Specific expert types to simulate")
+    consensus_only: bool = Field(False, description="Return only consensus recommendation")
+    include_reasoning: bool = Field(True, description="Include detailed expert reasoning")
 
 class InjuryPredictionRequest(BaseModel):
     player_id: int = Field(..., description="Player ID to analyze for injury risk")
@@ -2337,6 +2352,323 @@ async def get_breakout_likelihood_levels(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get likelihood levels: {str(e)}"
+        )
+
+
+# Game Script Prediction Endpoints
+
+@router.post("/game-script/predict")
+async def predict_game_script(
+    script_request: GameScriptPredictionRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Predict game script and flow for a specific NFL game
+    
+    Analyzes multiple factors to predict how a game will unfold including:
+    - Vegas betting information (spread, total)
+    - Weather conditions and game environment
+    - Team offensive and defensive tendencies
+    - Situational factors (division games, prime time, etc.)
+    - Historical patterns and matchup data
+    
+    Returns comprehensive game script prediction with player impact modifiers.
+    """
+    try:
+        logger.info(f"Game script prediction for {script_request.away_team} @ {script_request.home_team}, week {script_request.week} by user {current_user.id}")
+        
+        # Create game context from request
+        from ..services.ai.game_script_predictor import GameContext, TeamTendencies
+        
+        game_context = GameContext(
+            home_team=script_request.home_team,
+            away_team=script_request.away_team,
+            week=script_request.week,
+            point_spread=script_request.game_context.get('point_spread', 0.0),
+            total_points=script_request.game_context.get('total_points', 45.0),
+            home_implied_score=script_request.game_context.get('home_implied_score', 22.5),
+            away_implied_score=script_request.game_context.get('away_implied_score', 22.5),
+            temperature=script_request.game_context.get('temperature', 70),
+            wind_speed=script_request.game_context.get('wind_speed', 5),
+            precipitation_chance=script_request.game_context.get('precipitation_chance', 0.0),
+            field_conditions=script_request.game_context.get('field_conditions', 'good'),
+            playoff_implications=script_request.game_context.get('playoff_implications', False),
+            division_game=script_request.game_context.get('division_game', False),
+            prime_time=script_request.game_context.get('prime_time', False),
+            home_team_record=(8, 8),  # Would come from database
+            away_team_record=(8, 8),
+            rest_days_home=script_request.game_context.get('rest_days_home', 7),
+            rest_days_away=script_request.game_context.get('rest_days_away', 7)
+        )
+        
+        # Create team tendencies (mock data - would come from database)
+        home_tendencies = TeamTendencies(
+            team_name=script_request.home_team,
+            avg_plays_per_game=65.0,
+            pass_rate_neutral=0.6,
+            pass_rate_trailing=0.7,
+            pass_rate_leading=0.5,
+            red_zone_pass_rate=0.6,
+            seconds_per_play=26.0,
+            no_huddle_frequency=0.1,
+            rb_usage_leading=0.4,
+            rb_usage_trailing=0.2,
+            target_distribution={'WR1': 0.25, 'WR2': 0.15, 'TE': 0.15, 'RB': 0.15},
+            points_allowed_per_game=23.0,
+            plays_allowed_per_game=65.0,
+            pass_defense_rank=16,
+            run_defense_rank=16
+        )
+        
+        away_tendencies = TeamTendencies(
+            team_name=script_request.away_team,
+            avg_plays_per_game=63.0,
+            pass_rate_neutral=0.58,
+            pass_rate_trailing=0.72,
+            pass_rate_leading=0.48,
+            red_zone_pass_rate=0.58,
+            seconds_per_play=27.0,
+            no_huddle_frequency=0.08,
+            rb_usage_leading=0.42,
+            rb_usage_trailing=0.18,
+            target_distribution={'WR1': 0.24, 'WR2': 0.16, 'TE': 0.14, 'RB': 0.16},
+            points_allowed_per_game=24.5,
+            plays_allowed_per_game=67.0,
+            pass_defense_rank=18,
+            run_defense_rank=14
+        )
+        
+        # Get game script prediction
+        prediction = await game_script_predictor.predict_game_script(
+            game_context=game_context,
+            home_tendencies=home_tendencies,
+            away_tendencies=away_tendencies
+        )
+        
+        # Convert prediction to JSON-serializable format
+        prediction_dict = {
+            "home_team": prediction.home_team,
+            "away_team": prediction.away_team,
+            "predicted_script": prediction.predicted_script.value,
+            "script_confidence": prediction.script_confidence,
+            "predicted_pace": prediction.predicted_pace.value,
+            "predicted_home_score": prediction.predicted_home_score,
+            "predicted_away_score": prediction.predicted_away_score,
+            "predicted_total_plays_home": prediction.predicted_total_plays_home,
+            "predicted_total_plays_away": prediction.predicted_total_plays_away,
+            "quarter_scripts": [qs.value for qs in prediction.quarter_scripts],
+            "key_turning_points": prediction.key_turning_points,
+            "pass_heavy_team": prediction.pass_heavy_team,
+            "run_heavy_team": prediction.run_heavy_team,
+            "garbage_time_likely": prediction.garbage_time_likely,
+            "defensive_scores_likely": prediction.defensive_scores_likely,
+            "player_impact_modifiers": prediction.player_impact_modifiers,
+            "prediction_date": prediction.prediction_date.isoformat(),
+            "confidence_factors": prediction.confidence_factors,
+            "risk_factors": prediction.risk_factors
+        }
+        
+        return {
+            "success": True,
+            "data": prediction_dict,
+            "meta": {
+                "prediction_type": "game_script",
+                "game": f"{script_request.away_team} @ {script_request.home_team}",
+                "week": script_request.week,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Game script prediction error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to predict game script: {str(e)}"
+        )
+
+
+@router.post("/expert-simulation/analyze")
+async def simulate_expert_analysis(
+    expert_request: ExpertSimulationRequest,
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Simulate fantasy expert analysis and recommendations
+    
+    Creates AI personas that mimic different fantasy football experts:
+    - Analytics-focused experts (data-driven approach)
+    - Film study experts (qualitative insights)
+    - Contrarian experts (against consensus plays)
+    - Conservative experts (risk-averse selections)
+    - High-upside experts (ceiling-focused plays)
+    - Matchup specialists (weekly exploitation)
+    
+    Returns individual expert opinions and consensus recommendations.
+    """
+    try:
+        logger.info(f"Expert simulation request by user {current_user.id} for {expert_request.expert_types or 'all experts'}")
+        
+        # Get expert simulation
+        simulation_result = await expert_simulator.simulate_expert_panel(
+            decision_context=expert_request.decision_context,
+            expert_types=expert_request.expert_types,
+            include_reasoning=expert_request.include_reasoning
+        )
+        
+        # Format expert recommendations
+        expert_opinions = []
+        for expert_rec in simulation_result.expert_recommendations:
+            expert_dict = {
+                "expert_type": expert_rec.expert_type.value,
+                "expert_name": expert_rec.expert_name,
+                "recommendation": expert_rec.recommendation,
+                "confidence": expert_rec.confidence.value,
+                "confidence_score": expert_rec.confidence_score,
+                "primary_reasoning": expert_rec.primary_reasoning,
+                "supporting_factors": expert_rec.supporting_factors,
+                "concerns": expert_rec.concerns,
+                "key_stats": expert_rec.key_stats,
+                "comparable_situations": expert_rec.comparable_situations,
+                "contrarian_angle": expert_rec.contrarian_angle,
+                "projected_outcome": expert_rec.projected_outcome,
+                "upside_scenario": expert_rec.upside_scenario,
+                "downside_scenario": expert_rec.downside_scenario
+            }
+            expert_opinions.append(expert_dict)
+        
+        # Format consensus analysis
+        consensus_dict = {
+            "overall_recommendation": simulation_result.consensus_analysis.overall_recommendation,
+            "confidence_level": simulation_result.consensus_analysis.confidence_level.value,
+            "expert_agreement_percentage": simulation_result.consensus_analysis.expert_agreement_percentage,
+            "majority_reasoning": simulation_result.consensus_analysis.majority_reasoning,
+            "dissenting_opinions": simulation_result.consensus_analysis.dissenting_opinions,
+            "key_decision_factors": simulation_result.consensus_analysis.key_decision_factors,
+            "risk_assessment": simulation_result.consensus_analysis.risk_assessment,
+            "action_items": simulation_result.consensus_analysis.action_items
+        }
+        
+        # Prepare response based on consensus_only flag
+        if expert_request.consensus_only:
+            response_data = {
+                "consensus_analysis": consensus_dict,
+                "expert_count": len(expert_opinions),
+                "agreement_level": simulation_result.consensus_analysis.expert_agreement_percentage
+            }
+        else:
+            response_data = {
+                "expert_opinions": expert_opinions,
+                "consensus_analysis": consensus_dict,
+                "simulation_metadata": {
+                    "total_experts": len(expert_opinions),
+                    "expert_types": list(set(eo["expert_type"] for eo in expert_opinions)),
+                    "decision_context": expert_request.decision_context,
+                    "simulation_date": simulation_result.simulation_date.isoformat()
+                }
+            }
+        
+        return {
+            "success": True,
+            "data": response_data,
+            "meta": {
+                "simulation_type": "expert_panel",
+                "consensus_only": expert_request.consensus_only,
+                "expert_count": len(expert_opinions),
+                "agreement_percentage": simulation_result.consensus_analysis.expert_agreement_percentage,
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Expert simulation error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to simulate expert analysis: {str(e)}"
+        )
+
+
+@router.get("/expert-simulation/expert-types")
+async def get_expert_types(
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Get available expert types for simulation
+    
+    Returns all expert personas available for simulation with their
+    specialties and decision-making characteristics.
+    """
+    try:
+        expert_types = {
+            "analytics_focused": {
+                "name": "Analytics Expert",
+                "description": "Data-driven analysis with heavy reliance on advanced metrics",
+                "specialties": ["Advanced statistics", "Predictive modeling", "Efficiency metrics"],
+                "decision_style": "Quantitative, evidence-based",
+                "risk_tolerance": "Moderate",
+                "typical_insights": "Air yards, target share, red zone usage"
+            },
+            "film_study": {
+                "name": "Film Study Expert", 
+                "description": "Qualitative analysis based on game tape and player evaluation",
+                "specialties": ["Route running", "Blocking schemes", "Player development"],
+                "decision_style": "Qualitative, eye-test focused",
+                "risk_tolerance": "High",
+                "typical_insights": "Player talent evaluation, scheme fit"
+            },
+            "contrarian": {
+                "name": "Contrarian Expert",
+                "description": "Against-the-grain plays and undervalued player identification",
+                "specialties": ["Market inefficiencies", "Fade plays", "Sleeper identification"],
+                "decision_style": "Contrarian, value-seeking",
+                "risk_tolerance": "Very High",
+                "typical_insights": "Overlooked players, ownership contrasts"
+            },
+            "conservative": {
+                "name": "Conservative Expert",
+                "description": "Risk-averse approach focused on consistent performers",
+                "specialties": ["Floor plays", "Established players", "Reliable targets"],
+                "decision_style": "Risk-averse, consistency-focused",
+                "risk_tolerance": "Low",
+                "typical_insights": "Safe plays, injury-resistant players"
+            },
+            "high_upside": {
+                "name": "High-Upside Expert",
+                "description": "Ceiling-focused approach targeting explosive potential",
+                "specialties": ["Boom players", "Ceiling scenarios", "Home run picks"],
+                "decision_style": "Aggressive, upside-focused",
+                "risk_tolerance": "Very High", 
+                "typical_insights": "Breakout candidates, high-ceiling matchups"
+            },
+            "matchup_specialist": {
+                "name": "Matchup Specialist",
+                "description": "Weekly matchup exploitation and game script analysis",
+                "specialties": ["Defensive rankings", "Game scripts", "Weather impacts"],
+                "decision_style": "Situational, matchup-driven",
+                "risk_tolerance": "Moderate to High",
+                "typical_insights": "Defensive weaknesses, pace factors"
+            }
+        }
+        
+        return {
+            "success": True,
+            "data": {
+                "expert_types": expert_types,
+                "total_types": len(expert_types),
+                "usage_note": "Can request specific experts or let system select optimal panel"
+            },
+            "meta": {
+                "requested_by": current_user.id,
+                "generated_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Get expert types error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get expert types: {str(e)}"
         )
 
 

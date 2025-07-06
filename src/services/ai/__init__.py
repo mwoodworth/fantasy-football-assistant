@@ -17,6 +17,8 @@ from .weekly_report_generator import WeeklyReportGenerator
 from .analytics_dashboard import AnalyticsDashboard
 from .injury_predictor import InjuryPredictor
 from .breakout_detector import BreakoutDetector
+from .game_script_predictor import GameScriptPredictor
+from .expert_simulator import ExpertSimulator
 
 __all__ = [
     "ClaudeAIClient",
@@ -27,5 +29,7 @@ __all__ = [
     "WeeklyReportGenerator",
     "AnalyticsDashboard",
     "InjuryPredictor",
-    "BreakoutDetector"
+    "BreakoutDetector",
+    "GameScriptPredictor",
+    "ExpertSimulator"
 ]
