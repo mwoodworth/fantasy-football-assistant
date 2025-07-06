@@ -64,7 +64,7 @@ export class AuthService {
 
   static async login(credentials: LoginRequest): Promise<AuthResponse> {
     const response = await api.post('/auth/login', credentials);
-    const authData = response.data.data;
+    const authData = response.data;
     
     this.setAccessToken(authData.access_token);
     this.setRefreshToken(authData.refresh_token);
@@ -75,7 +75,7 @@ export class AuthService {
 
   static async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await api.post('/auth/register', data);
-    const authData = response.data.data;
+    const authData = response.data;
     
     this.setAccessToken(authData.access_token);
     this.setRefreshToken(authData.refresh_token);
@@ -102,7 +102,7 @@ export class AuthService {
 
   static async getCurrentUser(): Promise<User> {
     const response = await api.get('/auth/me');
-    const user = response.data.data;
+    const user = response.data;
     this.setUser(user);
     return user;
   }
