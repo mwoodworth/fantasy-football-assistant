@@ -44,7 +44,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const response = await AIService.sendChatMessage({
         message: content,
         context,
-        conversation_id: conversationId,
+        conversation_id: conversationId || undefined,
         analysis_type: analysisType,
       });
 
