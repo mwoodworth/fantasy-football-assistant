@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { PlayersPage } from './pages/PlayersPage';
+import { PlayerDetailPage } from './pages/PlayerDetailPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -53,6 +54,7 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="players" element={<PlayersPage />} />
+            <Route path="players/:playerId" element={<PlayerDetailPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />

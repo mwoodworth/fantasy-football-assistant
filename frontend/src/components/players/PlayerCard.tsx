@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Star, TrendingUp, TrendingDown, Activity, Users, AlertCircle } from 'lucide-react';
 import type { Player } from '../../pages/PlayersPage';
 import { Button } from '../common/Button';
@@ -36,10 +37,13 @@ export function PlayerCard({
   showActions = true 
 }: PlayerCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const navigate = useNavigate();
 
   const handleCardClick = () => {
     if (onPlayerClick) {
       onPlayerClick(player);
+    } else {
+      navigate(`/players/${player.id}`);
     }
   };
 
