@@ -7,9 +7,13 @@ const USER_KEY = 'ff_user';
 export interface User {
   id: number;
   email: string;
-  full_name: string;
+  username: string;
+  first_name?: string;
+  last_name?: string;
   is_active: boolean;
+  is_premium: boolean;
   created_at: string;
+  last_login?: string;
 }
 
 export interface LoginRequest {
@@ -20,7 +24,9 @@ export interface LoginRequest {
 export interface RegisterRequest {
   email: string;
   password: string;
-  full_name: string;
+  username: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface AuthResponse {

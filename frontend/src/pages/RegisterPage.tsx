@@ -9,9 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
-  full_name: z.string().min(2, 'Name must be at least 2 characters'),
+  username: z.string().min(3, 'Username must be at least 3 characters'),
+  first_name: z.string().min(2, 'First name must be at least 2 characters').optional(),
+  last_name: z.string().min(2, 'Last name must be at least 2 characters').optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -33,7 +35,7 @@ export function RegisterPage() {
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
-      await registerUser(data.email, data.password, data.full_name);
+      await registerUser(data.email, data.password, data.username, data.first_name, data.last_name);
       navigate('/dashboard');
     } catch (error) {
       // Error is handled in the store
@@ -66,11 +68,27 @@ export function RegisterPage() {
               )}
 
               <Input
-                label="Full name"
+                label="Username"
                 type="text"
-                autoComplete="name"
-                error={errors.full_name?.message}
-                {...register('full_name')}
+                autoComplete="username"
+                error={errors.username?.message}
+                {...register('username')}
+              />
+
+              <Input
+                label="First name (optional)"
+                type="text"
+                autoComplete="given-name"
+                error={errors.first_name?.message}
+                {...register('first_name')}
+              />
+
+              <Input
+                label="Last name (optional)"
+                type="text"
+                autoComplete="family-name"
+                error={errors.last_name?.message}
+                {...register('last_name')}
               />
 
               <Input
