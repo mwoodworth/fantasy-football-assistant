@@ -10,6 +10,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { PlayersPage } from './pages/PlayersPage';
 import { PlayerDetailPage } from './pages/PlayerDetailPage';
 import { TeamsPage } from './pages/TeamsPage';
+import { ESPNLeaguesPage } from './pages/ESPNLeaguesPage';
+import { DraftRoomPage } from './pages/DraftRoomPage';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 
@@ -56,6 +58,8 @@ function App() {
             <Route path="players" element={<PlayersPage />} />
             <Route path="players/:playerId" element={<PlayerDetailPage />} />
             <Route path="teams" element={<TeamsPage />} />
+            <Route path="espn/leagues" element={<ESPNLeaguesPage />} />
+            <Route path="espn/draft/:sessionId" element={<DraftRoomPage />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
           </Route>
