@@ -7,6 +7,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
 import bcrypt
+import base64
 from typing import Optional
 
 
@@ -44,14 +45,20 @@ class User(Base):
     def set_password(self, password: str) -> None:
         """Hash and set the user's password"""
         salt = bcrypt.gensalt()
-        self.hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+        hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), salt)
+        # Store as base64 string to safely preserve binary data
+        self.hashed_password = base64.b64encode(hashed_bytes).decode('utf-8')
 
     def verify_password(self, password: str) -> bool:
         """Verify the user's password"""
-        return bcrypt.checkpw(
-            password.encode('utf-8'), 
-            self.hashed_password.encode('utf-8')
-        )
+        try:
+            # Try to decode as base64 (new format)
+            hashed_bytes = base64.b64decode(self.hashed_password.encode('utf-8'))
+        except Exception:
+            # Fallback for legacy UTF-8 encoded passwords (if any exist)
+            hashed_bytes = self.hashed_password.encode('utf-8')
+        
+        return bcrypt.checkpw(password.encode('utf-8'), hashed_bytes)
 
     @property
     def full_name(self) -> str:
