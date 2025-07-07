@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from ..models.espn_league import ESPNLeague, DraftSession
 from ..models.fantasy import League, FantasyTeam
 from ..models.user import User
+from .espn_integration import espn_service
 # Define data classes since we can't import from frontend service
 from dataclasses import dataclass
 from typing import List
@@ -85,7 +86,7 @@ class ESPNBridgeService:
         
         return dashboard_data
     
-    def get_user_teams_data(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_user_teams_data(self, user_id: int) -> List[Dict[str, Any]]:
         """Get formatted team data for Teams page from ESPN leagues"""
         
         espn_leagues = self.db.query(ESPNLeague).filter(
@@ -95,16 +96,19 @@ class ESPNBridgeService:
         
         teams_data = []
         for league in espn_leagues:
+            # Get real team stats from ESPN service
+            record, points, rank, playoffs = await self._get_real_team_stats(league)
+            
             team_data = {
                 'id': f"espn_{league.id}",
                 'name': league.user_team_name or f"Team in {league.league_name}",
                 'league': league.league_name,
                 'platform': 'ESPN',
                 'season': league.season,
-                'record': self._get_team_record(league),
-                'points': self._get_team_points(league),
-                'rank': self._calculate_team_rank(league),
-                'playoffs': self._is_in_playoffs(league),
+                'record': record,
+                'points': points,
+                'rank': rank,
+                'playoffs': playoffs,
                 'active': league.is_active,
                 'espn_league_id': league.espn_league_id,
                 'draft_completed': league.draft_completed,
@@ -218,7 +222,7 @@ class ESPNBridgeService:
     def _calculate_team_rank(self, league: ESPNLeague) -> str:
         """Calculate team rank (mock implementation)"""
         # TODO: Implement actual rank calculation from ESPN data
-        return "3rd"
+        return "--"  # More realistic for 2025 pre-season
     
     def _get_weekly_points(self, league: ESPNLeague) -> str:
         """Get weekly points (mock implementation)"""
@@ -235,20 +239,68 @@ class ESPNBridgeService:
         # TODO: Count actual bench players
         return league.roster_positions.get('BENCH', 6) if league.roster_positions else 6
     
+    async def _get_real_team_stats(self, league: ESPNLeague) -> tuple[str, float, str, bool]:
+        """Get real team stats from ESPN service"""
+        try:
+            # Get team stats from ESPN service
+            async with espn_service.client as client:
+                team_stats = await client.get_team_stats(
+                    league.user_team_id or 1,
+                    league.espn_league_id,
+                    league.season,
+                    espn_s2=league.espn_s2,
+                    swid=league.swid
+                )
+                
+                if team_stats.get('success'):
+                    data = team_stats.get('data', {})
+                    record_data = data.get('record', {})
+                    standings_data = data.get('standings', {})
+                    
+                    # Format record
+                    wins = record_data.get('wins', 0)
+                    losses = record_data.get('losses', 0)
+                    ties = record_data.get('ties', 0)
+                    record = f"{wins}-{losses}" + (f"-{ties}" if ties > 0 else "")
+                    
+                    # Get points and rank
+                    points = standings_data.get('pointsFor', 0.0)
+                    rank = f"{standings_data.get('rank', 0)}"
+                    if rank.endswith('1') and not rank.endswith('11'):
+                        rank += "st"
+                    elif rank.endswith('2') and not rank.endswith('12'):
+                        rank += "nd" 
+                    elif rank.endswith('3') and not rank.endswith('13'):
+                        rank += "rd"
+                    else:
+                        rank += "th"
+                    
+                    # Determine playoff status (top 6 teams typically make playoffs)
+                    team_rank = standings_data.get('rank', 99)
+                    playoffs = team_rank <= 6
+                    
+                    return record, points, rank, playoffs
+                    
+        except Exception as e:
+            logger.warning(f"Failed to get real team stats for league {league.id}: {e}")
+        
+        # Fallback to mock data if ESPN call fails
+        return self._get_team_record(league), self._get_team_points(league), self._calculate_team_rank(league), self._is_in_playoffs(league)
+    
     def _get_team_record(self, league: ESPNLeague) -> str:
         """Get team record (mock implementation)"""
         # TODO: Get actual team record from ESPN
-        return "8-5"
+        return "0-0"  # More realistic for 2025 pre-season
     
     def _get_team_points(self, league: ESPNLeague) -> float:
-        """Get team points (mock implementation)"""
+        """Get team points (mock implementation)"""  
         # TODO: Get actual team points from ESPN
-        return 1247.8
+        return 0.0  # More realistic for 2025 pre-season
     
     def _is_in_playoffs(self, league: ESPNLeague) -> bool:
         """Check if team is in playoffs (mock implementation)"""
         # TODO: Check actual playoff status
-        return True
+        return False  # More realistic for 2025 pre-season
     
     def _generate_recent_activity(self, leagues: List[ESPNLeague]) -> List[Activity]:
         """Generate recent activity from ESPN leagues"""

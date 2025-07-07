@@ -43,7 +43,7 @@ class ESPNServiceClient:
         if self._client:
             await self._client.aclose()
     
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self, espn_s2: str = None, swid: str = None) -> Dict[str, str]:
         """Get request headers with authentication"""
         headers = {
             'Content-Type': 'application/json',
@@ -53,12 +53,26 @@ class ESPNServiceClient:
         if self.api_key:
             headers['X-API-Key'] = self.api_key
         
+        # Add ESPN cookies if provided
+        if espn_s2 and swid:
+            headers['X-ESPN-S2'] = espn_s2
+            headers['X-ESPN-SWID'] = swid
+        
         return headers
     
-    async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+    async def _make_request(self, method: str, endpoint: str, espn_s2: str = None, swid: str = None, **kwargs) -> Dict[str, Any]:
         """Make HTTP request to ESPN service"""
         if not self._client:
             raise ESPNServiceError("Client not initialized. Use async context manager.")
+        
+        # Add ESPN cookies to headers if provided
+        headers = kwargs.get('headers', {})
+        if espn_s2 and swid:
+            headers.update({
+                'X-ESPN-S2': espn_s2,
+                'X-ESPN-SWID': swid
+            })
+        kwargs['headers'] = headers
         
         try:
             logger.debug(f"ESPN Service request: {method} {endpoint}")
@@ -137,7 +151,7 @@ class ESPNServiceClient:
         )
     
     # Team Methods
-    async def get_team_roster(self, team_id: int, league_id: int, season: int = 2024, week: Optional[int] = None) -> Dict[str, Any]:
+    async def get_team_roster(self, team_id: int, league_id: int, season: int = 2024, week: Optional[int] = None, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get team roster"""
         params = {'leagueId': league_id, 'season': season}
         if week:
@@ -146,14 +160,18 @@ class ESPNServiceClient:
         return await self._make_request(
             'GET',
             f'/api/teams/{team_id}/roster',
+            espn_s2=espn_s2,
+            swid=swid,
             params=params
         )
     
-    async def get_team_stats(self, team_id: int, league_id: int, season: int = 2024) -> Dict[str, Any]:
+    async def get_team_stats(self, team_id: int, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get team statistics"""
         return await self._make_request(
             'GET',
             f'/api/teams/{team_id}/stats',
+            espn_s2=espn_s2,
+            swid=swid,
             params={'leagueId': league_id, 'season': season}
         )
     

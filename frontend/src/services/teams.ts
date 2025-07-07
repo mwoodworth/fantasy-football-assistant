@@ -39,6 +39,8 @@ export interface Player {
   team: string;
   status?: string;
   points?: number;
+  projected_points?: number;
+  injury_status?: string;
 }
 
 export interface Activity {
@@ -63,19 +65,13 @@ export interface TeamSettings {
 class TeamsService {
   
   async getUserTeams(includeESPN = true, includeManual = true, season?: number): Promise<Team[]> {
-    try {
-      const params = new URLSearchParams();
-      params.append('include_espn', includeESPN.toString());
-      params.append('include_manual', includeManual.toString());
-      if (season) params.append('season', season.toString());
-      
-      const response = await api.get(`/teams?${params.toString()}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching teams:', error);
-      // Return mock data as fallback
-      return this.getMockTeams();
-    }
+    const params = new URLSearchParams();
+    params.append('include_espn', includeESPN.toString());
+    params.append('include_manual', includeManual.toString());
+    if (season) params.append('season', season.toString());
+    
+    const response = await api.get(`/teams?${params.toString()}`);
+    return response.data;
   }
 
   async getTeamDetail(teamId: string): Promise<TeamDetail> {

@@ -8,7 +8,13 @@ const ESPNClient = require('../utils/espnClient');
 const logger = require('../utils/logger');
 
 const router = express.Router();
-const espnClient = new ESPNClient();
+
+// Helper function to create ESPN client with request-specific cookies
+function getESPNClient(req) {
+  const s2Cookie = req.headers['x-espn-s2'];
+  const swidCookie = req.headers['x-espn-swid'];
+  return new ESPNClient(s2Cookie, swidCookie);
+}
 
 // Validation schemas
 const teamParamsSchema = Joi.object({
@@ -46,6 +52,8 @@ router.get('/:teamId/roster', async (req, res, next) => {
 
     logger.info(`Fetching roster for team ${params.teamId} in league ${query.leagueId}`);
 
+    // Create ESPN client with request-specific cookies
+    const espnClient = getESPNClient(req);
     const roster = await espnClient.getTeamRoster(
       query.leagueId,
       params.teamId,
@@ -129,6 +137,7 @@ router.get('/:teamId/stats', async (req, res, next) => {
     logger.info(`Fetching stats for team ${params.teamId} in league ${query.leagueId}`);
 
     // Get all teams to find the specific team
+    const espnClient = getESPNClient(req);
     const teams = await espnClient.getLeagueTeams(query.leagueId, query.season);
     const team = teams.find(t => t.id === parseInt(params.teamId));
 
@@ -205,6 +214,7 @@ router.get('/:teamId/matchups', async (req, res, next) => {
 
     logger.info(`Fetching matchups for team ${params.teamId} in league ${query.leagueId}`);
 
+    const espnClient = getESPNClient(req);
     const scoreboard = await espnClient.getScoreboard(query.leagueId, query.season, query.week);
     
     // Filter matchups for this team
@@ -291,6 +301,7 @@ router.get('/compare', async (req, res, next) => {
     logger.info(`Comparing teams ${query.team1Id} vs ${query.team2Id} in league ${query.leagueId}`);
 
     // Get all teams to find the specific teams
+    const espnClient = getESPNClient(req);
     const teams = await espnClient.getLeagueTeams(query.leagueId, query.season);
     const team1 = teams.find(t => t.id === parseInt(query.team1Id));
     const team2 = teams.find(t => t.id === parseInt(query.team2Id));

@@ -14,6 +14,7 @@ from ..models.user import User
 from ..models.espn_league import ESPNLeague
 from ..utils.dependencies import get_current_active_user
 from ..services.espn_bridge import get_espn_bridge_service
+from ..config import settings
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -235,6 +236,17 @@ async def get_dashboard_overview(
     db: Session = Depends(get_db)
 ):
     """Get dashboard overview data from ESPN leagues"""
+    
+    # Check if we should use mock data
+    if settings.use_mock_data:
+        return DashboardOverview(
+            total_teams=3,
+            active_leagues=2,
+            weekly_points=145.7,
+            season_rank=3,
+            next_matchup="vs Thunder Bolts (Mock League)",
+            waiver_claims=2
+        )
     
     # Get ESPN bridge service
     espn_bridge = get_espn_bridge_service(db)

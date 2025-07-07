@@ -9,10 +9,11 @@ const axios = require('axios');
 const logger = require('./logger');
 
 class ESPNClient {
-  constructor() {
+  constructor(s2Cookie = null, swidCookie = null) {
     this.baseURL = process.env.ESPN_BASE_URL || 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl';
-    this.s2Cookie = process.env.ESPN_COOKIE_S2;
-    this.swidCookie = process.env.ESPN_COOKIE_SWID;
+    // Use provided cookies or fall back to environment
+    this.s2Cookie = s2Cookie || process.env.ESPN_COOKIE_S2;
+    this.swidCookie = swidCookie || process.env.ESPN_COOKIE_SWID;
     
     // Create axios instance with default config
     this.client = axios.create({

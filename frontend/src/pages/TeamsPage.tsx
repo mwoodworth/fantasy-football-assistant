@@ -8,16 +8,7 @@ import { Table } from '../components/common/Table';
 import { Select } from '../components/common/Select';
 import { Modal, ModalBody, ModalFooter } from '../components/common/Modal';
 import { Users, Trophy, TrendingUp, Settings, Star, ArrowUpDown, Bell, Shield, Eye, Play, RefreshCw } from 'lucide-react';
-import { teamsService } from '../services/teams';
-
-const mockRoster = [
-  { id: 1, name: 'Josh Allen', position: 'QB', team: 'BUF', status: 'starter', points: 287.4 },
-  { id: 2, name: 'Christian McCaffrey', position: 'RB', team: 'SF', status: 'starter', points: 234.7 },
-  { id: 3, name: 'Stefon Diggs', position: 'WR', team: 'BUF', status: 'starter', points: 198.3 },
-  { id: 4, name: 'Travis Kelce', position: 'TE', team: 'KC', status: 'starter', points: 156.8 },
-  { id: 5, name: 'Dak Prescott', position: 'QB', team: 'DAL', status: 'bench', points: 145.2 },
-  { id: 6, name: 'Tony Pollard', position: 'RB', team: 'DAL', status: 'bench', points: 134.9 },
-];
+import { teamsService, type TeamDetail } from '../services/teams';
 
 export function TeamsPage() {
   const navigate = useNavigate();
@@ -29,6 +20,13 @@ export function TeamsPage() {
   const { data: teams = [], isLoading, error, refetch } = useQuery({
     queryKey: ['user-teams'],
     queryFn: () => teamsService.getUserTeams(),
+  });
+
+  // Fetch team detail for selected team
+  const { data: teamDetail, isLoading: teamDetailLoading } = useQuery({
+    queryKey: ['team-detail', selectedTeam],
+    queryFn: () => teamsService.getTeamDetail(selectedTeam),
+    enabled: !!selectedTeam,
   });
 
   // Set initial selected team when teams load
@@ -73,7 +71,7 @@ export function TeamsPage() {
     {
       key: 'name',
       header: 'Player',
-      accessor: 'name' as keyof typeof mockRoster[0],
+      accessor: 'name' as keyof TeamDetail['roster'][0],
       sortable: true,
       render: (value: string, row: any) => (
         <div className="flex items-center space-x-2">
@@ -86,7 +84,7 @@ export function TeamsPage() {
     {
       key: 'status',
       header: 'Status',
-      accessor: 'status' as keyof typeof mockRoster[0],
+      accessor: 'status' as keyof TeamDetail['roster'][0],
       render: (value: string) => (
         <Badge variant={value === 'starter' ? 'success' : 'secondary'} size="sm">
           {value === 'starter' ? 'Starting' : 'Bench'}
@@ -96,11 +94,11 @@ export function TeamsPage() {
     {
       key: 'points',
       header: 'Points',
-      accessor: 'points' as keyof typeof mockRoster[0],
+      accessor: 'points' as keyof TeamDetail['roster'][0],
       sortable: true,
       align: 'right' as const,
-      render: (value: number) => (
-        <span className="font-mono">{value.toFixed(1)}</span>
+      render: (value: number | undefined) => (
+        <span className="font-mono">{value ? value.toFixed(1) : 'N/A'}</span>
       )
     },
     {
@@ -282,12 +280,35 @@ export function TeamsPage() {
             <CardTitle>Current Roster</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table
-              data={mockRoster}
-              columns={rosterColumns}
-              sortable={true}
-              hoverable={true}
-            />
+            {teamDetailLoading ? (
+              <div className="flex items-center justify-center h-32">
+                <div className="text-gray-500">Loading roster...</div>
+              </div>
+            ) : teamDetail?.roster && teamDetail.roster.length > 0 ? (
+              <Table
+                data={teamDetail.roster}
+                columns={rosterColumns}
+                sortable={true}
+                hoverable={true}
+              />
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Roster Data</h3>
+                <p className="text-gray-600 mb-4">
+                  {currentTeam?.platform === 'ESPN' 
+                    ? "Roster data will be available once your ESPN league sync is complete."
+                    : "Add players to your roster to see them here."
+                  }
+                </p>
+                {currentTeam?.platform === 'ESPN' && (
+                  <Button onClick={handleSyncTeam}>
+                    <RefreshCw className="w-4 h-4 mr-1" />
+                    Sync ESPN Data
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

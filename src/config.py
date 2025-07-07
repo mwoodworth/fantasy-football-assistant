@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     current_nfl_season: int = 2024
     default_league_size: int = 12
     
+    # Development/Testing settings
+    use_mock_data: bool = False
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
