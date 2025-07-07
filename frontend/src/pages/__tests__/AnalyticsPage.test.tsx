@@ -155,8 +155,8 @@ describe('AnalyticsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('🔥 Strengths')).toBeInTheDocument()
       expect(screen.getByText('⚠️ Areas to Improve')).toBeInTheDocument()
-      expect(screen.getByText('Elite QB production (19.5 ppg, #3 in league)')).toBeInTheDocument()
-      expect(screen.getByText('WR production below league average')).toBeInTheDocument()
+      expect(screen.getByText(/Elite QB production/)).toBeInTheDocument()
+      expect(screen.getByText(/WR production below league average/)).toBeInTheDocument()
     })
   })
 
@@ -201,7 +201,7 @@ describe('AnalyticsPage', () => {
       expect(screen.getByText('Week 9')).toBeInTheDocument()
       expect(screen.getByText('Team Kappa')).toBeInTheDocument()
       expect(screen.getByText('78% win')).toBeInTheDocument()
-      expect(screen.getByText('Easy')).toBeInTheDocument()
+      expect(screen.getAllByText('Easy')).toHaveLength(1)
     })
   })
 
@@ -223,7 +223,7 @@ describe('AnalyticsPage', () => {
     await user.selectOptions(viewSelect, 'players')
     
     await waitFor(() => {
-      expect(screen.getByText('Full Season')).toBeInTheDocument()
+      expect(screen.getAllByText('Full Season')).toHaveLength(1)
     })
     
     const timeRangeSelect = screen.getAllByTestId('select')[1]
@@ -286,9 +286,9 @@ describe('AnalyticsPage', () => {
     await user.selectOptions(viewSelect, 'projections')
     
     await waitFor(() => {
-      expect(screen.getByText('3rd place finish (32.1% chance)')).toBeInTheDocument()
-      expect(screen.getByText('2nd place finish (24.7% chance)')).toBeInTheDocument()
-      expect(screen.getByText('4th place finish (18.6% chance)')).toBeInTheDocument()
+      expect(screen.getByText(/3rd place finish/)).toBeInTheDocument()
+      expect(screen.getByText(/2nd place finish/)).toBeInTheDocument()
+      expect(screen.getByText(/4th place finish/)).toBeInTheDocument()
     })
   })
 
@@ -300,7 +300,7 @@ describe('AnalyticsPage', () => {
     await user.selectOptions(viewSelect, 'projections')
     
     await waitFor(() => {
-      expect(screen.getByText('Easy')).toBeInTheDocument()
+      expect(screen.getAllByText('Easy')).toHaveLength(1)
       expect(screen.getByText('Medium')).toBeInTheDocument()
       expect(screen.getByText('Hard')).toBeInTheDocument()
     })

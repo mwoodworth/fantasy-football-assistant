@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test/utils'
 import userEvent from '@testing-library/user-event'
 import { DraftRoomPage } from '../DraftRoomPage'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 
 // Mock react-router-dom
 const mockNavigate = vi.fn()
@@ -89,6 +89,31 @@ const mockRecommendations = [
 describe('DraftRoomPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    
+    // Reset mock location state
+    mockLocation.state = {
+      session: {
+        id: 123,
+        current_pick: 5,
+        current_round: 1,
+        user_pick_position: 8,
+        is_active: true,
+        is_live_synced: true,
+        next_user_pick: 8,
+        picks_until_user_turn: 3,
+        total_picks: 16,
+        started_at: '2024-09-01T10:00:00Z',
+        user_roster: [
+          { player_name: 'Josh Allen', position: 'QB' },
+          { player_name: 'Christian McCaffrey', position: 'RB' },
+        ],
+      },
+      league: {
+        id: 1,
+        league_name: 'Test League',
+        season: 2024,
+      },
+    }
     
     // Mock useQuery
     vi.mocked(useQuery).mockReturnValue({
@@ -324,10 +349,12 @@ describe('DraftRoomPage', () => {
 
   it('submits pick through manual entry', async () => {
     const mockMutate = vi.fn()
-    const { useMutation } = require('@tanstack/react-query')
-    useMutation.mockReturnValue({
+    vi.mocked(useMutation).mockReturnValue({
       mutate: mockMutate,
+      mutateAsync: vi.fn(),
       isPending: false,
+      isLoading: false,
+      error: null,
     })
     
     mockLocation.state.session.current_pick = 8

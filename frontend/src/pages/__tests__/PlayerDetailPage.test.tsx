@@ -7,10 +7,14 @@ import { PlayerDetailPage } from '../PlayerDetailPage'
 const mockNavigate = vi.fn()
 const mockParams = { playerId: '1' }
 
-vi.mock('react-router-dom', () => ({
-  useParams: () => mockParams,
-  useNavigate: () => mockNavigate,
-}))
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useParams: () => mockParams,
+    useNavigate: () => mockNavigate,
+  }
+})
 
 // Mock chart components
 vi.mock('../../components/analytics/PlayerPerformanceChart', () => ({
