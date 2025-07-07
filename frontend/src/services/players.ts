@@ -1,5 +1,18 @@
 import { api } from './api';
-import type { Player } from '../pages/PlayersPage';
+
+export interface Player {
+  id: number;
+  name: string;
+  position: string;
+  team: string;
+  bye_week: number;
+  injury_status?: string;
+  projected_points?: number;
+  average_points?: number;
+  trend?: 'up' | 'down' | 'stable';
+  ownership_percentage?: number;
+  trade_value?: number;
+}
 
 export interface PlayerSearchParams {
   search?: string;

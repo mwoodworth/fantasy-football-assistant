@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test/utils'
 import userEvent from '@testing-library/user-event'
 import { DraftRoomPage } from '../DraftRoomPage'
+import { useQuery } from '@tanstack/react-query'
 
 // Mock react-router-dom
 const mockNavigate = vi.fn()
@@ -29,15 +30,19 @@ const mockLocation = {
   },
 }
 
-vi.mock('react-router-dom', () => ({
-  useParams: () => mockParams,
-  useLocation: () => mockLocation,
-  Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
-    <div data-testid="navigate" data-to={to} data-replace={replace}>
-      Navigate to {to}
-    </div>
-  ),
-}))
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useParams: () => mockParams,
+    useLocation: () => mockLocation,
+    Navigate: ({ to, replace }: { to: string; replace?: boolean }) => (
+      <div data-testid="navigate" data-to={to} data-replace={replace}>
+        Navigate to {to}
+      </div>
+    ),
+  }
+})
 
 // Mock ESPN service
 vi.mock('../../services/espn', () => ({
@@ -47,14 +52,6 @@ vi.mock('../../services/espn', () => ({
   },
 }))
 
-// Mock React Query
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
-  }),
-}))
 
 // Mock ESPN components
 vi.mock('../../components/espn/DraftRecommendations', () => ({
@@ -94,23 +91,12 @@ describe('DraftRoomPage', () => {
     vi.clearAllMocks()
     
     // Mock useQuery
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: mockRecommendations,
       isLoading: false,
       error: null,
       refetch: vi.fn(),
     })
-    
-    // Mock useMutation
-    const { useMutation } = require('@tanstack/react-query')
-    useMutation.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-    })
-    
-    const { espnService } = require('../../services/espn')
-    espnService.getDraftRecommendations.mockResolvedValue(mockRecommendations)
   })
 
   it('redirects when no session ID', () => {
@@ -278,8 +264,7 @@ describe('DraftRoomPage', () => {
   })
 
   it('handles recommendation loading state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: null,
       isLoading: true,
       error: null,
@@ -292,9 +277,8 @@ describe('DraftRoomPage', () => {
   })
 
   it('handles recommendation error state', () => {
-    const { useQuery } = require('@tanstack/react-query')
     const mockRefetch = vi.fn()
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: null,
       isLoading: false,
       error: new Error('Failed to fetch'),
@@ -308,8 +292,7 @@ describe('DraftRoomPage', () => {
   })
 
   it('shows no recommendations message when empty', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: null,
       isLoading: false,
       error: null,
@@ -323,8 +306,7 @@ describe('DraftRoomPage', () => {
 
   it('calls refresh recommendations when refresh button clicked', async () => {
     const mockRefetch = vi.fn()
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: mockRecommendations,
       isLoading: false,
       error: null,

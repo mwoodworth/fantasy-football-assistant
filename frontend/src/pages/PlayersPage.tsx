@@ -1,26 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Filter } from 'lucide-react';
-import { PlayerService } from '../services/players';
+import { PlayerService, type Player } from '../services/players';
 import { PlayerCard } from '../components/players/PlayerCard';
 import { PlayerFilters } from '../components/players/PlayerFilters';
 import { PlayerSearchInput } from '../components/players/PlayerSearchInput';
 import { Button } from '../components/common/Button';
 import { cn } from '../utils/cn';
-
-export interface Player {
-  id: number;
-  name: string;
-  position: string;
-  team: string;
-  bye_week: number;
-  injury_status?: string;
-  projected_points?: number;
-  average_points?: number;
-  trend?: 'up' | 'down' | 'stable';
-  ownership_percentage?: number;
-  trade_value?: number;
-}
 
 interface PlayerFiltersType {
   position?: string;

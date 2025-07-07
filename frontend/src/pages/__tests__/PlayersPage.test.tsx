@@ -2,17 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test/utils'
 import userEvent from '@testing-library/user-event'
 import { PlayersPage } from '../PlayersPage'
+import { useQuery } from '@tanstack/react-query'
 
 // Mock the player service
 vi.mock('../../services/players', () => ({
   PlayerService: {
     searchPlayers: vi.fn(),
   },
-}))
-
-// Mock React Query
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
 }))
 
 // Mock player components
@@ -72,15 +68,11 @@ describe('PlayersPage', () => {
     vi.clearAllMocks()
     
     // Mock useQuery
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: mockPlayers,
       isLoading: false,
       error: null,
     })
-    
-    const { PlayerService } = require('../../services/players')
-    PlayerService.searchPlayers.mockResolvedValue(mockPlayers)
   })
 
   it('renders page header', () => {
@@ -163,10 +155,9 @@ describe('PlayersPage', () => {
   })
 
   it('handles search input', async () => {
-    const { useQuery } = require('@tanstack/react-query')
     const mockRefetch = vi.fn()
     
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: mockPlayers,
       isLoading: false,
       error: null,
@@ -183,8 +174,7 @@ describe('PlayersPage', () => {
   })
 
   it('displays loading state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: null,
       isLoading: true,
       error: null,
@@ -202,8 +192,7 @@ describe('PlayersPage', () => {
   })
 
   it('displays error state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: null,
       isLoading: false,
       error: new Error('Failed to fetch'),
@@ -216,8 +205,7 @@ describe('PlayersPage', () => {
   })
 
   it('displays no players found state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -235,8 +223,8 @@ describe('PlayersPage', () => {
     render(<PlayersPage />)
     
     // Show filters
-    const filtersButton = screen.getByRole('button', { name: /filters/i })
-    await user.click(filtersButton)
+    const filtersButtons = screen.getAllByRole('button', { name: /filters/i })
+    await user.click(filtersButtons[0])
     
     // Apply a filter
     const filterQBButton = screen.getByRole('button', { name: /filter qb/i })
@@ -255,8 +243,8 @@ describe('PlayersPage', () => {
     await user.type(searchInput, 'Josh')
     
     // Show filters and apply one
-    const filtersButton = screen.getByRole('button', { name: /filters/i })
-    await user.click(filtersButton)
+    const filtersButtons = screen.getAllByRole('button', { name: /filters/i })
+    await user.click(filtersButtons[0])
     
     const filterQBButton = screen.getByRole('button', { name: /filter qb/i })
     await user.click(filterQBButton)
@@ -274,8 +262,8 @@ describe('PlayersPage', () => {
     render(<PlayersPage />)
     
     // Show filters
-    const filtersButton = screen.getByRole('button', { name: /filters/i })
-    await user.click(filtersButton)
+    const filtersButtons = screen.getAllByRole('button', { name: /filters/i })
+    await user.click(filtersButtons[0])
     
     // Apply a filter
     const filterQBButton = screen.getByRole('button', { name: /filter qb/i })
@@ -290,19 +278,17 @@ describe('PlayersPage', () => {
     render(<PlayersPage />)
     
     // useQuery should be called with the correct queryFn
-    const { useQuery } = require('@tanstack/react-query')
-    const lastCall = useQuery.mock.calls[useQuery.mock.calls.length - 1]
-    const queryConfig = lastCall[0]
+    const mockCall = vi.mocked(useQuery).mock.calls[vi.mocked(useQuery).mock.calls.length - 1]
+    const queryConfig = mockCall[0]
     
     expect(queryConfig.queryKey).toEqual(['players', '', {}])
     expect(queryConfig.queryFn).toBeDefined()
   })
 
   it('updates query when search or filters change', async () => {
-    const { useQuery } = require('@tanstack/react-query')
     let queryKey = ['players', '', {}]
     
-    useQuery.mockImplementation((config) => {
+    vi.mocked(useQuery).mockImplementation((config) => {
       queryKey = config.queryKey
       return {
         data: mockPlayers,

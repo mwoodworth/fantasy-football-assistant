@@ -2,25 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test/utils'
 import userEvent from '@testing-library/user-event'
 import { ESPNLeaguesPage } from '../ESPNLeaguesPage'
+import { useQuery } from '@tanstack/react-query'
 
 // Mock the ESPN service
 vi.mock('../../services/espn', () => ({
   espnService: {
     getMyLeagues: vi.fn(),
     disconnectLeague: vi.fn(),
-    formatSyncStatus: vi.fn(),
-    formatScoreType: vi.fn(),
+    formatSyncStatus: vi.fn(() => ({ text: 'Active', color: 'success' })),
+    formatScoreType: vi.fn(() => 'Standard Scoring'),
   },
 }))
 
-// Mock React Query
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
-  useMutation: vi.fn(),
-  useQueryClient: () => ({
-    invalidateQueries: vi.fn(),
-  }),
-}))
 
 // Mock ESPN components
 vi.mock('../../components/espn/ConnectLeagueForm', () => ({
@@ -107,23 +100,11 @@ describe('ESPNLeaguesPage', () => {
     vi.clearAllMocks()
     
     // Mock useQuery
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: mockLeagues,
       isLoading: false,
       error: null,
     })
-    
-    // Mock useMutation
-    const { useMutation } = require('@tanstack/react-query')
-    useMutation.mockReturnValue({
-      mutate: vi.fn(),
-    })
-    
-    const { espnService } = require('../../services/espn')
-    espnService.getMyLeagues.mockResolvedValue(mockLeagues)
-    espnService.formatSyncStatus.mockReturnValue({ text: 'Active', color: 'success' })
-    espnService.formatScoreType.mockReturnValue('Standard Scoring')
   })
 
   it('renders page header', () => {
@@ -280,8 +261,7 @@ describe('ESPNLeaguesPage', () => {
   })
 
   it('displays loading state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: [],
       isLoading: true,
       error: null,
@@ -293,8 +273,7 @@ describe('ESPNLeaguesPage', () => {
   })
 
   it('displays error state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: [],
       isLoading: false,
       error: new Error('Failed to fetch'),
@@ -306,8 +285,7 @@ describe('ESPNLeaguesPage', () => {
   })
 
   it('displays empty state when no leagues', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockReturnValue({
+    vi.mocked(useQuery).mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -350,8 +328,7 @@ describe('ESPNLeaguesPage', () => {
   it('calls ESPN service with correct parameters', () => {
     render(<ESPNLeaguesPage />)
     
-    const { useQuery } = require('@tanstack/react-query')
-    const lastCall = useQuery.mock.calls[useQuery.mock.calls.length - 1]
+    const lastCall = vi.mocked(useQuery).mock.calls[vi.mocked(useQuery).mock.calls.length - 1]
     const queryConfig = lastCall[0]
     
     expect(queryConfig.queryKey).toEqual(['espn-leagues', false])

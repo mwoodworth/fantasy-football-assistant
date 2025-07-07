@@ -2,13 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '../../test/utils'
 import userEvent from '@testing-library/user-event'
 import { TeamsPage } from '../TeamsPage'
+import { useQuery } from '@tanstack/react-query'
 
 // Mock react-router-dom
 const mockNavigate = vi.fn()
 
-vi.mock('react-router-dom', () => ({
-  useNavigate: () => mockNavigate,
-}))
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom')
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  }
+})
 
 // Mock teams service
 vi.mock('../../services/teams', () => ({
@@ -23,10 +28,6 @@ vi.mock('../../services/teams', () => ({
   },
 }))
 
-// Mock React Query
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: vi.fn(),
-}))
 
 // Mock Table component
 vi.mock('../../components/common/Table', () => ({
@@ -140,8 +141,7 @@ describe('TeamsPage', () => {
     vi.clearAllMocks()
     
     // Mock useQuery calls
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: mockTeams,
@@ -159,13 +159,6 @@ describe('TeamsPage', () => {
       }
       return { data: null, isLoading: false, error: null }
     })
-    
-    const { teamsService } = require('../../services/teams')
-    teamsService.getUserTeams.mockResolvedValue(mockTeams)
-    teamsService.getTeamDetail.mockResolvedValue(mockTeamDetail)
-    teamsService.formatTeamOption.mockImplementation((team) => ({ label: team.name }))
-    teamsService.getPlatformColor.mockReturnValue('text-blue-600')
-    teamsService.getTeamIcon.mockReturnValue('🏈')
   })
 
   it('renders page header', () => {
@@ -217,8 +210,7 @@ describe('TeamsPage', () => {
 
   it('shows draft button for teams with incomplete draft', () => {
     // Mock team with incomplete draft
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: [{ ...mockTeams[0], draft_completed: false }],
@@ -326,8 +318,7 @@ describe('TeamsPage', () => {
   })
 
   it('handles loading state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: [],
@@ -345,8 +336,7 @@ describe('TeamsPage', () => {
   })
 
   it('handles error state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: [],
@@ -364,8 +354,7 @@ describe('TeamsPage', () => {
   })
 
   it('displays empty state when no teams', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: [],
@@ -385,8 +374,7 @@ describe('TeamsPage', () => {
   })
 
   it('navigates to ESPN leagues when draft button clicked', async () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: [{ ...mockTeams[0], draft_completed: false }],
@@ -419,8 +407,7 @@ describe('TeamsPage', () => {
   })
 
   it('displays empty roster message when no roster data', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: mockTeams,
@@ -445,8 +432,7 @@ describe('TeamsPage', () => {
   })
 
   it('displays roster loading state', () => {
-    const { useQuery } = require('@tanstack/react-query')
-    useQuery.mockImplementation(({ queryKey }: { queryKey: string[] }) => {
+    vi.mocked(useQuery).mockImplementation(({ queryKey }: { queryKey: string[] }) => {
       if (queryKey[0] === 'user-teams') {
         return {
           data: mockTeams,
