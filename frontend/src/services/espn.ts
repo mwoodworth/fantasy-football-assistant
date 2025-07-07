@@ -21,6 +21,8 @@ export interface ESPNLeague {
   last_sync?: string;
   user_team_name?: string;
   league_type_description: string;
+  espn_s2?: string;
+  swid?: string;
 }
 
 export interface LeagueConnection {
@@ -120,6 +122,14 @@ class ESPNService {
 
   async disconnectLeague(leagueId: number): Promise<{ message: string }> {
     const response = await api.delete(`/espn/leagues/${leagueId}`);
+    return response.data;
+  }
+
+  async updateESPNCookies(leagueId: number, espnS2: string, swid: string): Promise<{ message: string; league_id: number; validation_status: string }> {
+    const response = await api.put(`/espn/leagues/${leagueId}/update-cookies`, {
+      espn_s2: espnS2,
+      swid: swid
+    });
     return response.data;
   }
 

@@ -77,6 +77,8 @@ class LeagueResponse(BaseModel):
     last_sync: Optional[datetime]
     user_team_name: Optional[str]
     league_type_description: str
+    espn_s2: Optional[str] = None
+    swid: Optional[str] = None
 
 
 class DraftSessionResponse(BaseModel):
@@ -194,7 +196,9 @@ async def get_user_leagues(
             sync_status=league.sync_status,
             last_sync=league.last_sync,
             user_team_name=league.user_team_name,
-            league_type_description=league.get_league_type_description()
+            league_type_description=league.get_league_type_description(),
+            espn_s2=league.espn_s2,
+            swid=league.swid
         )
         for league in leagues
     ]

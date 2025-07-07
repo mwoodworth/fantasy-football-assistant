@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, AlertCircle, Trash2, Archive, RefreshCw } from 'lucide-react';
+import { Settings, AlertCircle, Trash2, Archive, RefreshCw, Key, Lock } from 'lucide-react';
 import { espnService, type ESPNLeague } from '../../services/espn';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -17,6 +17,11 @@ interface LeagueSettingsModalProps {
 export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsModalProps) {
   const [customName, setCustomName] = useState(league.league_name);
   const [confirmDelete, setConfirmDelete] = useState('');
+  const [showCookieSection, setShowCookieSection] = useState(false);
+  const [cookieData, setCookieData] = useState({
+    espnS2: league.espn_s2 || '',
+    swid: league.swid || ''
+  });
   const queryClient = useQueryClient();
 
   // Update league mutation (placeholder for now)
@@ -38,6 +43,17 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
       onClose();
+    },
+  });
+
+  // Update ESPN cookies mutation
+  const updateCookiesMutation = useMutation({
+    mutationFn: async ({ espnS2, swid }: { espnS2: string; swid: string }) => {
+      return espnService.updateESPNCookies(league.id, espnS2, swid);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
+      setShowCookieSection(false);
     },
   });
 
@@ -67,6 +83,23 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
 
   const handleRefresh = () => {
     refreshMutation.mutate();
+  };
+
+  const handleUpdateCookies = () => {
+    if (cookieData.espnS2 && cookieData.swid) {
+      updateCookiesMutation.mutate({
+        espnS2: cookieData.espnS2,
+        swid: cookieData.swid
+      });
+    }
+  };
+
+  const handleCancelCookieUpdate = () => {
+    setShowCookieSection(false);
+    setCookieData({
+      espnS2: league.espn_s2 || '',
+      swid: league.swid || ''
+    });
   };
 
   const getSyncStatusBadge = (status: string) => {
@@ -141,6 +174,109 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
           <p className="text-xs text-gray-500 mt-1">
             Customize how this league appears in your dashboard
           </p>
+        </div>
+
+        {/* ESPN Authentication */}
+        <div>
+          <h4 className="font-medium text-gray-900 mb-3">ESPN Authentication</h4>
+          
+          {!showCookieSection ? (
+            <Card className="p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <Key className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h5 className="font-medium mb-1">Update ESPN Cookies</h5>
+                    <p className="text-sm text-gray-600">
+                      Update your ESPN s2 and swid cookies to maintain access to private league data.
+                      {league.espn_s2 && league.swid && (
+                        <span className="text-green-600 ml-1">✓ Currently configured</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCookieSection(true)}
+                  className="ml-4 flex items-center gap-1"
+                >
+                  <Lock className="h-3 w-3" />
+                  Update Cookies
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-4 border-blue-200 bg-blue-50">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Key className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h5 className="font-medium text-blue-900 mb-1">Update ESPN Cookies</h5>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Enter your updated ESPN authentication cookies to continue accessing private league data.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-blue-900 mb-1">
+                      ESPN S2 Cookie
+                    </label>
+                    <Input
+                      type="password"
+                      value={cookieData.espnS2}
+                      onChange={(e) => setCookieData(prev => ({ ...prev, espnS2: e.target.value }))}
+                      placeholder="Paste your ESPN S2 cookie here"
+                      className="border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-blue-900 mb-1">
+                      ESPN SWID Cookie
+                    </label>
+                    <Input
+                      type="password"
+                      value={cookieData.swid}
+                      onChange={(e) => setCookieData(prev => ({ ...prev, swid: e.target.value }))}
+                      placeholder="Paste your ESPN SWID cookie here"
+                      className="border-blue-300 focus:border-blue-500 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="p-3 bg-blue-100 border border-blue-200 rounded-md">
+                  <p className="text-blue-900 text-sm">
+                    <strong>How to get your ESPN cookies:</strong><br />
+                    1. Log into ESPN Fantasy in your browser<br />
+                    2. Open Developer Tools (F12)<br />
+                    3. Go to Application/Storage → Cookies → espn.com<br />
+                    4. Copy the values for "espn_s2" and "SWID"
+                  </p>
+                </div>
+                
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelCookieUpdate}
+                    disabled={updateCookiesMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleUpdateCookies}
+                    disabled={!cookieData.espnS2 || !cookieData.swid || updateCookiesMutation.isPending}
+                  >
+                    {updateCookiesMutation.isPending ? 'Updating...' : 'Update Cookies'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* League Actions */}
@@ -237,13 +373,14 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
         </div>
 
         {/* Error Display */}
-        {(updateLeagueMutation.error || disconnectMutation.error || refreshMutation.error) && (
+        {(updateLeagueMutation.error || disconnectMutation.error || refreshMutation.error || updateCookiesMutation.error) && (
           <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
             <AlertCircle className="h-4 w-4" />
             <span>
               {updateLeagueMutation.error?.message || 
                disconnectMutation.error?.message || 
                refreshMutation.error?.message || 
+               updateCookiesMutation.error?.message ||
                'An error occurred. Please try again.'}
             </span>
           </div>
@@ -254,6 +391,13 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
           <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
             <Settings className="h-4 w-4" />
             <span>League data refreshed successfully!</span>
+          </div>
+        )}
+
+        {updateCookiesMutation.isSuccess && (
+          <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+            <Key className="h-4 w-4" />
+            <span>ESPN cookies updated successfully!</span>
           </div>
         )}
 
