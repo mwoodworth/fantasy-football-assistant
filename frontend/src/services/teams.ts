@@ -70,13 +70,13 @@ class TeamsService {
     params.append('include_manual', includeManual.toString());
     if (season) params.append('season', season.toString());
     
-    const response = await api.get(`/teams?${params.toString()}`);
+    const response = await api.get(`/teams/?${params.toString()}`);
     return response.data;
   }
 
   async getTeamDetail(teamId: string): Promise<TeamDetail> {
     try {
-      const response = await api.get(`/teams/${teamId}`);
+      const response = await api.get(`/teams/${teamId}/`);
       return response.data;
     } catch (error) {
       console.error('Error fetching team detail:', error);
@@ -85,7 +85,7 @@ class TeamsService {
   }
 
   async syncTeam(teamId: string): Promise<{ message: string; last_sync?: string }> {
-    const response = await api.post(`/teams/${teamId}/sync`);
+    const response = await api.post(`/teams/${teamId}/sync/`);
     return response.data;
   }
 
@@ -96,7 +96,7 @@ class TeamsService {
     draft_date?: string;
     can_start_draft: boolean;
   }> {
-    const response = await api.get(`/teams/${teamId}/draft`);
+    const response = await api.get(`/teams/${teamId}/draft/`);
     return response.data;
   }
 
