@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from ..models.database import get_db
 from ..models.user import User
 from ..utils.dependencies import get_current_active_user
-from ..services.espn_integration import espn_service, ESPNServiceError
+from ..services.espn_integration import espn_service, ESPNServiceError, ESPNAuthError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,15 @@ async def validate_espn_cookies(cookie_request: ESPNCookieValidationRequest):
         
         return result
         
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -94,6 +103,15 @@ async def get_espn_cookie_status():
         
         return result
         
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -122,6 +140,15 @@ async def get_league_info(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -150,6 +177,15 @@ async def get_league_teams(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -182,6 +218,15 @@ async def get_free_agents(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -214,6 +259,15 @@ async def get_team_roster(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -242,6 +296,15 @@ async def get_draft_results(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -281,6 +344,15 @@ async def sync_league_data(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -335,6 +407,15 @@ async def search_players(
                 "requested_by": current_user.id
             }
         }
+    except ESPNAuthError as e:
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

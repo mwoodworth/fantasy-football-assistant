@@ -22,7 +22,7 @@ from ..models.espn_league import (
     UserLeagueSettings
 )
 from ..utils.dependencies import get_current_active_user
-from ..services.espn_integration import espn_service, ESPNServiceError
+from ..services.espn_integration import espn_service, ESPNServiceError, ESPNAuthError
 from ..services.ai.claude_client import ai_client
 from ..services.draft_assistant import draft_assistant
 
@@ -674,3 +674,70 @@ async def generate_draft_recommendations(session: DraftSession, db: Session) -> 
         db.refresh(recommendation)
         
         return recommendation
+
+
+class ESPNCookieUpdate(BaseModel):
+    espn_s2: str = Field(..., description="ESPN S2 cookie")
+    swid: str = Field(..., description="ESPN SWID cookie")
+
+
+@router.put("/leagues/{league_id}/update-cookies")
+async def update_espn_cookies(
+    league_id: int,
+    cookie_data: ESPNCookieUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Update ESPN authentication cookies for a league"""
+    
+    # Get the league and verify ownership
+    league = db.query(ESPNLeague).filter(
+        and_(
+            ESPNLeague.id == league_id,
+            ESPNLeague.user_id == current_user.id
+        )
+    ).first()
+    
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found or access denied")
+    
+    try:
+        # Validate cookies with ESPN service
+        async with espn_service.client as client:
+            validation_result = await client.validate_espn_cookies(
+                cookie_data.espn_s2, 
+                cookie_data.swid
+            )
+        
+        if not validation_result.get('valid', False):
+            raise HTTPException(
+                status_code=400, 
+                detail="Invalid ESPN cookies. Please check your s2 and swid values."
+            )
+        
+        # Update league with new cookies
+        league.espn_s2 = cookie_data.espn_s2  # TODO: Encrypt these
+        league.swid = cookie_data.swid        # TODO: Encrypt these
+        league.updated_at = datetime.utcnow()
+        league.sync_status = 'active'
+        
+        # Clear any auth error flags
+        if hasattr(league, 'needs_auth_update'):
+            league.needs_auth_update = False
+        
+        db.commit()
+        
+        logger.info(f"Updated ESPN cookies for league {league_id} by user {current_user.id}")
+        
+        return {
+            "message": "ESPN cookies updated successfully",
+            "league_id": league_id,
+            "validation_status": "valid"
+        }
+        
+    except ESPNServiceError as e:
+        logger.error(f"ESPN service error updating cookies for league {league_id}: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to validate ESPN cookies: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error updating cookies for league {league_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update ESPN cookies")

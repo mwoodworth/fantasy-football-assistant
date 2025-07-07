@@ -100,6 +100,18 @@ class TeamsService {
     return response.data;
   }
 
+  async updateESPNCookies(leagueId: number, espnS2: string, swid: string): Promise<{
+    message: string;
+    league_id: number;
+    validation_status: string;
+  }> {
+    const response = await api.put(`/espn/leagues/${leagueId}/update-cookies`, {
+      espn_s2: espnS2,
+      swid: swid
+    });
+    return response.data;
+  }
+
   // Mock data for development/fallback
   private getMockTeams(): Team[] {
     return [

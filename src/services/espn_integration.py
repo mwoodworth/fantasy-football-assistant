@@ -20,6 +20,13 @@ class ESPNServiceError(Exception):
     pass
 
 
+class ESPNAuthError(ESPNServiceError):
+    """Exception for ESPN authentication errors requiring user action"""
+    def __init__(self, message: str, requires_auth_update: bool = True):
+        super().__init__(message)
+        self.requires_auth_update = requires_auth_update
+
+
 class ESPNServiceClient:
     """Client for communicating with Node.js ESPN service"""
     
@@ -79,9 +86,9 @@ class ESPNServiceClient:
             response = await self._client.request(method, endpoint, **kwargs)
             
             if response.status_code == 401:
-                raise ESPNServiceError("ESPN service authentication failed")
+                raise ESPNAuthError("ESPN authentication failed. Please update your s2 and swid cookies in your league settings.")
             elif response.status_code == 403:
-                raise ESPNServiceError("Access denied to ESPN resource")
+                raise ESPNAuthError("Access denied to ESPN resource. Please update your s2 and swid cookies in your league settings.")
             elif response.status_code == 404:
                 raise ESPNServiceError("ESPN resource not found")
             elif response.status_code == 429:

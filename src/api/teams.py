@@ -14,7 +14,7 @@ from ..models.fantasy import League, FantasyTeam
 from ..models.espn_league import ESPNLeague
 from ..utils.dependencies import get_current_active_user
 from ..services.espn_bridge import get_espn_bridge_service
-from ..services.espn_integration import espn_service, ESPNServiceError
+from ..services.espn_integration import espn_service, ESPNServiceError, ESPNAuthError
 from ..config import settings
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -333,6 +333,17 @@ async def get_live_espn_roster(espn_league_id: int, team_id: int, season: int = 
         
         return formatted_roster
         
+    except ESPNAuthError as e:
+        logger.warning(f"ESPN authentication error getting roster: {e}")
+        # Re-raise auth errors so they can be handled by the frontend
+        raise HTTPException(
+            status_code=401, 
+            detail={
+                "message": str(e),
+                "requires_auth_update": True,
+                "action": "update_espn_cookies"
+            }
+        )
     except ESPNServiceError as e:
         logger.error(f"ESPN service error getting roster: {e}")
         # Fall back to mock data if ESPN service fails

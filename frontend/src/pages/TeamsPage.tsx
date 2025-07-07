@@ -15,6 +15,9 @@ export function TeamsPage() {
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedView, setSelectedView] = useState('roster');
   const [showSettings, setShowSettings] = useState(false);
+  const [showCookieUpdate, setShowCookieUpdate] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [cookieUpdateData, setCookieUpdateData] = useState({ espnS2: '', swid: '', leagueId: 0 });
 
   // Fetch teams from API
   const { data: teams = [], isLoading, error, refetch } = useQuery({
@@ -23,10 +26,30 @@ export function TeamsPage() {
   });
 
   // Fetch team detail for selected team
-  const { data: teamDetail, isLoading: teamDetailLoading } = useQuery({
+  const { data: teamDetail, isLoading: teamDetailLoading, error: teamDetailError } = useQuery({
     queryKey: ['team-detail', selectedTeam],
     queryFn: () => teamsService.getTeamDetail(selectedTeam),
     enabled: !!selectedTeam,
+    retry: (failureCount, error: any) => {
+      // Don't retry if it's an authentication error
+      if (error?.response?.status === 401) {
+        const errorDetail = error?.response?.data?.detail;
+        if (typeof errorDetail === 'object' && errorDetail?.requires_auth_update) {
+          setAuthError(errorDetail.message);
+          const currentTeam = teams.find(t => t.id === selectedTeam);
+          if (currentTeam?.espn_league_id) {
+            setCookieUpdateData({ 
+              espnS2: '', 
+              swid: '', 
+              leagueId: currentTeam.espn_league_id 
+            });
+            setShowCookieUpdate(true);
+          }
+        }
+        return false;
+      }
+      return failureCount < 2;
+    }
   });
 
   // Set initial selected team when teams load
@@ -61,9 +84,44 @@ export function TeamsPage() {
       try {
         await teamsService.syncTeam(currentTeam.id);
         refetch();
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error syncing team:', error);
+        // Handle authentication errors
+        if (error?.response?.status === 401) {
+          const errorDetail = error?.response?.data?.detail;
+          if (typeof errorDetail === 'object' && errorDetail?.requires_auth_update) {
+            setAuthError(errorDetail.message);
+            if (currentTeam.espn_league_id) {
+              setCookieUpdateData({ 
+                espnS2: '', 
+                swid: '', 
+                leagueId: currentTeam.espn_league_id 
+              });
+              setShowCookieUpdate(true);
+            }
+          }
+        }
       }
+    }
+  };
+
+  const handleUpdateCookies = async () => {
+    try {
+      await teamsService.updateESPNCookies(
+        cookieUpdateData.leagueId,
+        cookieUpdateData.espnS2,
+        cookieUpdateData.swid
+      );
+      setShowCookieUpdate(false);
+      setAuthError(null);
+      setCookieUpdateData({ espnS2: '', swid: '', leagueId: 0 });
+      // Refetch team data after successful update
+      refetch();
+    } catch (error: any) {
+      console.error('Error updating ESPN cookies:', error);
+      // Show validation error if cookies are invalid
+      const errorMessage = error?.response?.data?.detail || 'Failed to update ESPN cookies';
+      setAuthError(errorMessage);
     }
   };
 
@@ -480,6 +538,92 @@ export function TeamsPage() {
             </Button>
             <Button onClick={() => setShowSettings(false)}>
               Save Settings
+            </Button>
+          </div>
+        </ModalFooter>
+      </Modal>
+
+      {/* ESPN Cookie Update Modal */}
+      <Modal
+        isOpen={showCookieUpdate}
+        onClose={() => {
+          setShowCookieUpdate(false);
+          setAuthError(null);
+          setCookieUpdateData({ espnS2: '', swid: '', leagueId: 0 });
+        }}
+        title="Update ESPN Authentication"
+        size="md"
+      >
+        <ModalBody>
+          <div className="space-y-4">
+            {authError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-red-800 text-sm">{authError}</p>
+              </div>
+            )}
+            
+            <div>
+              <p className="text-gray-700 mb-4">
+                Your ESPN authentication has expired. Please update your s2 and swid cookies to continue accessing your league data.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ESPN S2 Cookie
+                  </label>
+                  <input
+                    type="text"
+                    value={cookieUpdateData.espnS2}
+                    onChange={(e) => setCookieUpdateData(prev => ({ ...prev, espnS2: e.target.value }))}
+                    placeholder="Paste your ESPN S2 cookie here"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ESPN SWID Cookie
+                  </label>
+                  <input
+                    type="text"
+                    value={cookieUpdateData.swid}
+                    onChange={(e) => setCookieUpdateData(prev => ({ ...prev, swid: e.target.value }))}
+                    placeholder="Paste your ESPN SWID cookie here"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <p className="text-blue-800 text-sm">
+                  <strong>How to get your ESPN cookies:</strong><br />
+                  1. Log into ESPN Fantasy in your browser<br />
+                  2. Open Developer Tools (F12)<br />
+                  3. Go to Application/Storage → Cookies → espn.com<br />
+                  4. Copy the values for "espn_s2" and "SWID"
+                </p>
+              </div>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <div className="flex justify-end space-x-3">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowCookieUpdate(false);
+                setAuthError(null);
+                setCookieUpdateData({ espnS2: '', swid: '', leagueId: 0 });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdateCookies}
+              disabled={!cookieUpdateData.espnS2 || !cookieUpdateData.swid}
+            >
+              Update Cookies
             </Button>
           </div>
         </ModalFooter>

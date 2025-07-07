@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..models.espn_league import ESPNLeague, DraftSession
 from ..models.fantasy import League, FantasyTeam
 from ..models.user import User
-from .espn_integration import espn_service
+from .espn_integration import espn_service, ESPNAuthError
 # Define data classes since we can't import from frontend service
 from dataclasses import dataclass
 from typing import List
@@ -281,6 +281,12 @@ class ESPNBridgeService:
                     
                     return record, points, rank, playoffs
                     
+        except ESPNAuthError as e:
+            logger.warning(f"ESPN authentication failed for league {league.id}: {e}")
+            # For auth errors, still return fallback data but mark league as needing auth update
+            league.needs_auth_update = True  # This would need to be added to the model
+            # Fallback to pre-season values
+            return self._get_team_record(league), self._get_team_points(league), self._calculate_team_rank(league), self._is_in_playoffs(league)
         except Exception as e:
             logger.warning(f"Failed to get real team stats for league {league.id}: {e}")
         
