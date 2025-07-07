@@ -22,7 +22,11 @@
       "Bash(python3 -m pytest -v --tb=short tests/test_e2e_flows.py::TestUserRegistrationFlow::test_complete_user_registration_flow -s)",
       "Bash(python3 -m pytest -v --tb=short tests/test_integration_api.py::TestAPIIntegration::test_api_root_endpoint -s)",
       "Bash(python3 -m pytest -v --tb=no --cov=src --cov-report=term -q)",
-      "Bash(python3 -m pytest --cov=src --cov-report=term --no-header -q)"
+      "Bash(python3 -m pytest --cov=src --cov-report=term --no-header -q)",
+      "Bash(python3 -m pytest tests/test_services_auth.py::TestAuthService::test_create_access_token -v --tb=short)",
+      "Bash(python3 -m pytest tests/test_services_auth.py tests/test_services_user.py -v --tb=no -q)",
+      "Bash(python3 -m pytest -v --tb=no --cov=src --cov-report=term -q --ignore=tests/test_ai_injury_data_collector.py --ignore=tests/test_ai_train_injury_models.py --ignore=tests/test_utils_mock_data.py)",
+      "Bash(python3 -m pytest --cov=src --cov-report=term --no-header -q --ignore=tests/test_ai_injury_data_collector.py --ignore=tests/test_ai_train_injury_models.py --ignore=tests/test_utils_mock_data.py)"
     ],
     "deny": []
   }

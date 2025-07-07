@@ -37,5 +37,5 @@ class TestLineupOptimizer:
         optimizer = LineupOptimizer(test_db_session, mock_league)
         
         # Should handle missing team_id gracefully
-        result = optimizer.optimize_lineup(team_id=999, week=1)
+        result = optimizer.optimize_lineup(fantasy_team_id=999, week=1)
         assert result is not None

@@ -37,8 +37,11 @@ class TestTradeAnalyzer:
         
         # Should handle empty trade gracefully
         result = analyzer.evaluate_trade(
-            team_id=1,
-            give_player_ids=[],
-            receive_player_ids=[]
+            team1_id=1,
+            team1_sends=[],
+            team1_receives=[],
+            team2_id=2,
+            team2_sends=[],
+            team2_receives=[]
         )
         assert result is not None

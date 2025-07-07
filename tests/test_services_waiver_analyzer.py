@@ -37,5 +37,5 @@ class TestWaiverAnalyzer:
         analyzer = WaiverAnalyzer(test_db_session, mock_league)
         
         # Should handle missing team gracefully
-        result = analyzer.get_waiver_recommendations(team_id=999, week=1)
+        result = analyzer.get_waiver_recommendations(fantasy_team_id=999, week=1)
         assert result is not None
