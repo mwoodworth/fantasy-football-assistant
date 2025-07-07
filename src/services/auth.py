@@ -78,9 +78,12 @@ class AuthService:
         return user
     
     @classmethod
-    def authenticate_user(cls, db: Session, email: str, password: str) -> Optional[User]:
-        """Authenticate a user with email and password"""
-        user = db.query(User).filter(User.email == email).first()
+    def authenticate_user(cls, db: Session, identifier: str, password: str, by_email: bool = True) -> Optional[User]:
+        """Authenticate a user with email/username and password"""
+        if by_email:
+            user = db.query(User).filter(User.email == identifier).first()
+        else:
+            user = db.query(User).filter(User.username == identifier).first()
         
         if not user:
             return None

@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 from src.models.database import SessionLocal
 from src.models.user import User
 from src.models.fantasy import League, FantasyTeam
-from src.services.draft_assistant import DraftAssistant
+from src.services.draft_assistant import DraftAssistantService
 from src.services.lineup_optimizer import LineupOptimizer
 from src.services.waiver_analyzer import WaiverAnalyzer
 from src.services.trade_analyzer import TradeAnalyzer
@@ -75,7 +75,7 @@ def test_phase2_features():
         # Test Draft Assistant
         print("\n🎯 Testing Draft Assistant...")
         try:
-            draft_assistant = DraftAssistant(db, test_league)
+            draft_assistant = DraftAssistantService(db, test_league)
             
             # Test draft board
             draft_board = draft_assistant.get_draft_board(50)

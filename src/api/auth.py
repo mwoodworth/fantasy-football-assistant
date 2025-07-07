@@ -22,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 security = HTTPBearer()
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: UserCreate,
     db: Session = Depends(get_db)
@@ -41,14 +41,7 @@ async def register(
             favorite_team=user_data.favorite_team
         )
         
-        # Create tokens
-        tokens = AuthService.create_user_tokens(user)
-        
-        return TokenResponse(
-            access_token=tokens["access_token"],
-            refresh_token=tokens["refresh_token"],
-            user=UserResponse.model_validate(user)
-        )
+        return UserResponse.model_validate(user)
         
     except HTTPException:
         raise
@@ -66,15 +59,21 @@ async def login(
 ):
     """Authenticate user and return tokens"""
     
-    # Authenticate user
-    user = AuthService.authenticate_user(
-        db, login_data.email, login_data.password
-    )
+    # Determine if login by email or username
+    user = None
+    if login_data.email:
+        user = AuthService.authenticate_user(
+            db, login_data.email, login_data.password, by_email=True
+        )
+    elif login_data.username:
+        user = AuthService.authenticate_user(
+            db, login_data.username, login_data.password, by_email=False
+        )
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect username/email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     

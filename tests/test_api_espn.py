@@ -14,13 +14,16 @@ class TestESPNAPI:
     
     def test_health_check(self, test_client: TestClient):
         """Test ESPN service health check"""
-        with patch('src.services.espn_integration.espn_service') as mock_service:
-            mock_service.client.__aenter__ = AsyncMock()
-            mock_service.client.__aexit__ = AsyncMock()
-            mock_service.client.health_check = AsyncMock(return_value={"status": "healthy"})
-            mock_service.client.espn_connectivity_check = AsyncMock(return_value={"status": "connected"})
+        with patch('src.services.espn_integration.ESPNServiceClient') as mock_client_class:
+            # Create a mock client instance
+            mock_client = AsyncMock()
+            mock_client.health_check = AsyncMock(return_value={"status": "healthy"})
+            mock_client.espn_connectivity_check = AsyncMock(return_value={"status": "connected"})
             
-            response = test_client.get("/espn/health")
+            # Make the client class return our mock instance
+            mock_client_class.return_value = mock_client
+            
+            response = test_client.get("/api/espn/health")
             
             assert response.status_code == 200
             data = response.json()
@@ -35,11 +38,14 @@ class TestESPNAPI:
         }
         
         with patch('src.services.espn_integration.espn_service') as mock_service:
-            mock_service.client.__aenter__ = AsyncMock()
-            mock_service.client.__aexit__ = AsyncMock()
-            mock_service.client.validate_espn_cookies = AsyncMock(return_value={"valid": True})
+            # Create a mock client that supports async context manager
+            mock_client = AsyncMock()
+            mock_client.validate_espn_cookies = AsyncMock(return_value={"valid": True})
             
-            response = test_client.post("/espn/auth/validate-cookies", json=cookie_data)
+            # Make the client property return our mock
+            mock_service.client = mock_client
+            
+            response = test_client.post("/api/espn/auth/validate-cookies", json=cookie_data)
             
             assert response.status_code == 200
     
@@ -50,7 +56,7 @@ class TestESPNAPI:
             mock_service.client.__aexit__ = AsyncMock()
             mock_service.client.get_cookie_status = AsyncMock(return_value={"configured": False})
             
-            response = test_client.get("/espn/auth/cookie-status")
+            response = test_client.get("/api/espn/auth/cookie-status")
             
             assert response.status_code == 200
     
@@ -63,7 +69,7 @@ class TestESPNAPI:
                 "size": 10
             })
             
-            response = test_client.get("/espn/leagues/12345", headers=auth_headers)
+            response = test_client.get("/api/espn/leagues/12345", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -78,7 +84,7 @@ class TestESPNAPI:
                 {"id": 2, "name": "Team 2"}
             ])
             
-            response = test_client.get("/espn/leagues/12345/teams", headers=auth_headers)
+            response = test_client.get("/api/api/espn/leagues/12345/teams", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -93,7 +99,7 @@ class TestESPNAPI:
                 {"id": 2, "name": "Free Agent 2", "position": "RB"}
             ])
             
-            response = test_client.get("/espn/leagues/12345/free-agents", headers=auth_headers)
+            response = test_client.get("/api/api/espn/leagues/12345/free-agents", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -110,7 +116,7 @@ class TestESPNAPI:
                 ]
             })
             
-            response = test_client.get("/espn/teams/1/roster?league_id=12345", headers=auth_headers)
+            response = test_client.get("/api/espn/teams/1/roster?league_id=12345", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -124,7 +130,7 @@ class TestESPNAPI:
                 {"id": 2, "name": "Christian McCaffrey", "position": "RB"}
             ])
             
-            response = test_client.get("/espn/players/search?league_id=12345&name=josh", headers=auth_headers)
+            response = test_client.get("/api/espn/players/search?league_id=12345&name=josh", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -136,7 +142,7 @@ class TestESPNAPI:
         with patch('src.services.espn_integration.espn_service') as mock_service:
             mock_service.clear_cache = AsyncMock()
             
-            response = test_client.delete("/espn/cache", headers=auth_headers)
+            response = test_client.delete("/api/espn/cache", headers=auth_headers)
             
             assert response.status_code == 200
             data = response.json()
@@ -149,7 +155,7 @@ class TestESPNAPI:
         with patch('src.services.espn_integration.espn_service') as mock_service:
             mock_service.get_cached_or_fetch = AsyncMock(side_effect=ESPNServiceError("ESPN API error"))
             
-            response = test_client.get("/espn/leagues/12345", headers=auth_headers)
+            response = test_client.get("/api/espn/leagues/12345", headers=auth_headers)
             
             assert response.status_code == 400
             assert "ESPN API error" in response.json()["detail"]
@@ -161,7 +167,7 @@ class TestESPNAPI:
         with patch('src.services.espn_integration.espn_service') as mock_service:
             mock_service.get_cached_or_fetch = AsyncMock(side_effect=ESPNAuthError("Authentication failed"))
             
-            response = test_client.get("/espn/leagues/12345", headers=auth_headers)
+            response = test_client.get("/api/espn/leagues/12345", headers=auth_headers)
             
             assert response.status_code == 401
             data = response.json()
@@ -169,6 +175,6 @@ class TestESPNAPI:
     
     def test_unauthorized_access(self, test_client: TestClient):
         """Test accessing ESPN endpoints without authentication"""
-        response = test_client.get("/espn/leagues/12345")
+        response = test_client.get("/api/espn/leagues/12345")
         
         assert response.status_code == 401

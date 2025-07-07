@@ -10,7 +10,13 @@ from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 from httpx import AsyncClient
 
-from src.models.database import Base, get_db
+# Import all models to ensure they're registered with Base
+from src.models import (
+    Base, User, Player, PlayerStats, Team, League, FantasyTeam, 
+    Roster, Trade, WaiverClaim, ESPNLeague, DraftSession, 
+    DraftRecommendation, LeagueHistoricalData, UserLeagueSettings
+)
+from src.models.database import get_db
 from src.main import app
 from src.config import Settings
 
@@ -29,13 +35,26 @@ def test_settings():
 @pytest.fixture(scope="function")
 def test_db_engine():
     """Create a test database engine for each test"""
+    # Use a temporary file instead of in-memory database
+    # This ensures the database persists across connections
+    import tempfile
+    temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
+    temp_db.close()
+    
     engine = create_engine(
-        "sqlite:///:memory:", 
+        f"sqlite:///{temp_db.name}", 
         connect_args={"check_same_thread": False}
     )
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)
+    
+    # Clean up the temporary file
+    import os
+    try:
+        os.unlink(temp_db.name)
+    except OSError:
+        pass
 
 
 @pytest.fixture(scope="function")
@@ -54,8 +73,11 @@ def test_db_session(test_db_engine):
 
 
 @pytest.fixture(scope="function")
-def test_client(test_db_session, test_settings):
+def test_client(test_db_session, test_settings, monkeypatch):
     """Create a test client with dependency overrides"""
+    
+    # Disable ESPN service startup during testing
+    monkeypatch.setattr("src.main.start_espn_service", lambda: None)
     
     def override_get_db():
         try:
@@ -135,7 +157,7 @@ def sample_espn_league_data():
 def auth_headers(test_client, sample_user_data):
     """Get authorization headers for authenticated requests"""
     # Create user
-    response = test_client.post("/auth/register", json=sample_user_data)
+    response = test_client.post("/api/auth/register", json=sample_user_data)
     assert response.status_code == 201
     
     # Login
@@ -143,7 +165,7 @@ def auth_headers(test_client, sample_user_data):
         "username": sample_user_data["username"],
         "password": sample_user_data["password"]
     }
-    response = test_client.post("/auth/login", data=login_data)
+    response = test_client.post("/api/auth/login", json=login_data)
     assert response.status_code == 200
     
     token = response.json()["access_token"]

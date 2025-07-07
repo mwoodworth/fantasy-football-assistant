@@ -41,9 +41,10 @@ class UserResponse(UserBase):
         from_attributes = True
 
 
-# Auth schemas
+# Auth schemas  
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
     password: str
 
 

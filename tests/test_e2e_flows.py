@@ -25,7 +25,7 @@ class TestUserRegistrationFlow:
         }
         
         register_response = test_client.post("/api/auth/register", json=user_data)
-        assert register_response.status_code == 200
+        assert register_response.status_code == 201
         
         register_data = register_response.json()
         assert "access_token" in register_data
@@ -288,7 +288,7 @@ class TestCompleteUserJourney:
         }
         
         register_response = test_client.post("/api/auth/register", json=user_data)
-        assert register_response.status_code == 200
+        assert register_response.status_code == 201
         
         token = register_response.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
@@ -362,7 +362,7 @@ class TestCompleteUserJourney:
         }
         
         register_response = test_client.post("/api/auth/register", json=user_data)
-        assert register_response.status_code == 200
+        assert register_response.status_code == 201
         
         token = register_response.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}

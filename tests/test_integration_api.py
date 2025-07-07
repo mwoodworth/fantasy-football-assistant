@@ -35,16 +35,15 @@ class TestAPIIntegration:
         response = test_client.get("/")
         
         assert response.status_code == 200
-        data = response.json()
-        assert "message" in data
-        assert "version" in data
-        assert "endpoints" in data
+        assert response.headers["content-type"] == "text/html; charset=utf-8"
+        assert "Assistant Fantasy Football Manager" in response.text
+        assert "API Documentation" in response.text
     
     def test_authentication_flow(self, test_client: TestClient, test_db_session, sample_user_data):
         """Test complete authentication flow"""
         # Register a new user
-        register_response = test_client.post("/auth/register", json=sample_user_data)
-        assert register_response.status_code == 200
+        register_response = test_client.post("/api/auth/register", json=sample_user_data)
+        assert register_response.status_code == 201
         
         register_data = register_response.json()
         assert "access_token" in register_data
