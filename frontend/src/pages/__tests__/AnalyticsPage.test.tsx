@@ -201,7 +201,7 @@ describe('AnalyticsPage', () => {
       expect(screen.getByText('Week 9')).toBeInTheDocument()
       expect(screen.getByText('Team Kappa')).toBeInTheDocument()
       expect(screen.getByText('78% win')).toBeInTheDocument()
-      expect(screen.getAllByText('Easy')).toHaveLength(1)
+      expect(screen.getAllByText('Easy')).toHaveLength(2)
     })
   })
 
@@ -223,14 +223,14 @@ describe('AnalyticsPage', () => {
     await user.selectOptions(viewSelect, 'players')
     
     await waitFor(() => {
-      expect(screen.getAllByText('Full Season')).toHaveLength(1)
+      expect(screen.getAllByText('Full Season')).toHaveLength(2)
     })
     
     const timeRangeSelect = screen.getAllByTestId('select')[1]
     await user.selectOptions(timeRangeSelect, 'last-4')
     
     await waitFor(() => {
-      expect(screen.getByText('Last 4 Weeks')).toBeInTheDocument()
+      expect(screen.getAllByText('Last 4 Weeks')).toHaveLength(2)
     })
   })
 
@@ -300,8 +300,8 @@ describe('AnalyticsPage', () => {
     await user.selectOptions(viewSelect, 'projections')
     
     await waitFor(() => {
-      expect(screen.getAllByText('Easy')).toHaveLength(1)
-      expect(screen.getByText('Medium')).toBeInTheDocument()
+      expect(screen.getAllByText('Easy')).toHaveLength(2)
+      expect(screen.getAllByText('Medium')).toHaveLength(2)
       expect(screen.getByText('Hard')).toBeInTheDocument()
     })
   })

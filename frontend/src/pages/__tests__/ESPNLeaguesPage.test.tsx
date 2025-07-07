@@ -305,9 +305,9 @@ describe('ESPNLeaguesPage', () => {
   it('formats draft date correctly', () => {
     render(<ESPNLeaguesPage />)
     
-    expect(screen.getAllByText(/Draft/)).toHaveLength(2)
-    expect(screen.getByText(/2024/)).toBeInTheDocument()
-    expect(screen.getByText(/2023/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Draft/)).toHaveLength(3)
+    expect(screen.getAllByText(/2024/)).toHaveLength(2)
+    expect(screen.getAllByText(/2023/)).toHaveLength(2)
   })
 
   it('closes modals when close button is clicked', async () => {

@@ -134,6 +134,7 @@ describe('DraftRoomPage', () => {
   })
 
   it('shows loading when no session data', () => {
+    mockParams.sessionId = '123' // Ensure sessionId is present
     mockLocation.state = null
     
     render(<DraftRoomPage />)

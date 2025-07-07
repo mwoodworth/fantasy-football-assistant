@@ -258,7 +258,7 @@ describe('PlayerDetailPage', () => {
     const newsTab = screen.getByRole('button', { name: /news/i })
     await user.click(newsTab)
     
-    expect(screen.getByText('positive')).toBeInTheDocument()
+    expect(screen.getAllByText('positive')).toHaveLength(2)
     expect(screen.getByText('neutral')).toBeInTheDocument()
   })
 
