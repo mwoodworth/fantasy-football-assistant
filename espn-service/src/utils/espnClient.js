@@ -323,6 +323,19 @@ class ESPNClient {
   }
 
   /**
+   * Format players data array
+   */
+  _formatPlayersData(players) {
+    if (!players || !Array.isArray(players)) return [];
+
+    return players.map(playerEntry => {
+      // Handle both direct player objects and player entries with nested player data
+      const player = playerEntry.player || playerEntry;
+      return this._formatPlayerData(player);
+    }).filter(player => player !== null);
+  }
+
+  /**
    * Format player statistics
    */
   _formatPlayerStats(stats) {

@@ -7,7 +7,12 @@
       "Bash(rg:*)",
       "Bash(grep:*)",
       "Bash(timeout:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npm test)",
+      "Bash(python3 -m pytest tests/test_integration_api.py::TestAPIIntegration::test_api_health_check -v)",
+      "Bash(python3 -m pytest tests/test_e2e_flows.py::TestUserRegistrationFlow::test_complete_user_registration_flow -v)",
+      "Bash(python3 -m pytest tests/test_api_auth.py::TestAuthAPI::test_register_user -v)",
+      "Bash(python3 -m pytest tests/test_api_auth.py -v)"
     ],
     "deny": []
   }

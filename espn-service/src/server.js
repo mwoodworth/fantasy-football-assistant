@@ -167,24 +167,26 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`ESPN Fantasy Football Service started on port ${PORT}`, {
-    environment: process.env.NODE_ENV,
-    port: PORT,
-    timestamp: new Date().toISOString()
-  });
-  
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`
+// Start server (skip in test environment)
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    logger.info(`ESPN Fantasy Football Service started on port ${PORT}`, {
+      environment: process.env.NODE_ENV,
+      port: PORT,
+      timestamp: new Date().toISOString()
+    });
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`
 🏈 ESPN Fantasy Football Service
 ================================
 🚀 Server: http://localhost:${PORT}
 📚 API Docs: http://localhost:${PORT}/api/docs
 ❤️  Health: http://localhost:${PORT}/health
 🔧 Environment: ${process.env.NODE_ENV}
-    `);
-  }
-});
+      `);
+    }
+  });
+}
 
 module.exports = app;
