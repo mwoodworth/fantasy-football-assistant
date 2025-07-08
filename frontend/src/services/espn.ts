@@ -17,6 +17,7 @@ export interface ESPNLeague {
   scoring_type: string;
   draft_date?: string;
   draft_completed: boolean;
+  user_draft_position?: number;
   sync_status: string;
   last_sync?: string;
   user_team_name?: string;

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Play, Wifi, WifiOff, AlertCircle } from 'lucide-react';
+import { Play, AlertCircle } from 'lucide-react';
 import { espnService, type ESPNLeague, type DraftSessionStart } from '../../services/espn';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -16,8 +16,15 @@ interface DraftSessionModalProps {
 
 export function DraftSessionModal({ isOpen, onClose, league }: DraftSessionModalProps) {
   const navigate = useNavigate();
-  const [draftPosition, setDraftPosition] = useState(1);
-  const [liveSync, setLiveSync] = useState(true);
+  const [draftPosition, setDraftPosition] = useState(league.user_draft_position || 1);
+  const [liveSync, setLiveSync] = useState(false);
+
+  // Auto-populate draft position from league data
+  useEffect(() => {
+    if (league.user_draft_position) {
+      setDraftPosition(league.user_draft_position);
+    }
+  }, [league.user_draft_position]);
 
   const startDraftMutation = useMutation({
     mutationFn: espnService.startDraftSession,
@@ -73,50 +80,6 @@ export function DraftSessionModal({ isOpen, onClose, league }: DraftSessionModal
           </p>
         </div>
 
-        {/* Sync Options */}
-        <div className="space-y-4">
-          <h4 className="font-medium text-gray-900">Draft Sync Options</h4>
-          
-          <div className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="syncMode"
-                checked={liveSync}
-                onChange={() => setLiveSync(true)}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Wifi className="h-4 w-4 text-green-600" />
-                  <span className="font-medium">Live Sync (Recommended)</span>
-                </div>
-                <p className="text-sm text-gray-600 mt-1">
-                  Automatically sync with ESPN draft room. Get real-time updates as picks are made.
-                </p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="radio"
-                name="syncMode"
-                checked={!liveSync}
-                onChange={() => setLiveSync(false)}
-                className="mt-1"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <WifiOff className="h-4 w-4 text-gray-600" />
-                  <span className="font-medium">Manual Entry</span>
-                </div>
-                <p className="text-sm text-gray-600 mt-1">
-                  Manually enter picks as they happen. Use this if live sync is not working.
-                </p>
-              </div>
-            </label>
-          </div>
-        </div>
 
         {/* Warning for completed drafts */}
         {league.draft_completed && (

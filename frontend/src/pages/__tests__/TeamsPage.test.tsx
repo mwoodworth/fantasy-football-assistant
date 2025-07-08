@@ -260,14 +260,14 @@ describe('TeamsPage', () => {
     await user.click(tradesTab)
     
     expect(screen.getAllByText('Trade Center')).toHaveLength(2)
-    expect(screen.getByText('Trade Analyzer')).toBeInTheDocument()
+    expect(screen.getByText('No Trade Targets')).toBeInTheDocument()
     
     // Switch to waivers tab
     const waiversTab = screen.getByRole('button', { name: /waivers/i })
     await user.click(waiversTab)
     
     expect(screen.getByText('Waiver Wire')).toBeInTheDocument()
-    expect(screen.getByText('Waiver Targets')).toBeInTheDocument()
+    expect(screen.getByText('No Waiver Targets')).toBeInTheDocument()
   })
 
   it('opens settings modal', async () => {

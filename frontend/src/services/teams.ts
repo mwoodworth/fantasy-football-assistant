@@ -61,6 +61,77 @@ export interface TeamSettings {
   points_against?: number;
 }
 
+export interface WaiverTarget {
+  player_id: number;
+  name: string;
+  position: string;
+  team: string;
+  ownership_percentage: number;
+  recommendation_score: number;
+  pickup_priority: string;
+  suggested_faab_bid: number;
+  analysis: string;
+  trending_direction: 'up' | 'down' | 'stable';
+  recent_performance: Record<string, number>;
+  matchup_analysis: string;
+  injury_status: string;
+}
+
+export interface TrendingPlayer {
+  player_id: number;
+  name: string;
+  position: string;
+  team: string;
+  trend_type: 'most_added' | 'most_dropped';
+  percentage_rostered: number;
+  weekly_change: number;
+  points_last_week: number;
+  season_points: number;
+}
+
+export interface WaiverClaimRequest {
+  team_id: string;
+  player_to_add_id: number;
+  player_to_drop_id?: number;
+  faab_bid: number;
+  waiver_priority: number;
+  notes?: string;
+}
+
+export interface TradeProposal {
+  team1_id: string;
+  team1_players: Player[];
+  team2_id: string;
+  team2_players: Player[];
+}
+
+export interface TradeEvaluation {
+  fairness_score: number;
+  grade: string;
+  team1_impact: {
+    value_change: number;
+    needs_improvement: Record<string, number>;
+    recommendation: string;
+  };
+  team2_impact: {
+    value_change: number;
+    needs_improvement: Record<string, number>;
+    recommendation: string;
+  };
+  analysis: string;
+  verdict: 'accept' | 'reject' | 'consider';
+}
+
+export interface TradeTarget {
+  player: Player;
+  team_id: string;
+  team_name: string;
+  trade_value: number;
+  likelihood: 'high' | 'medium' | 'low';
+  suggested_offer: Player[];
+  rationale: string;
+}
+
 // Teams API Service
 class TeamsService {
   
@@ -76,7 +147,9 @@ class TeamsService {
 
   async getTeamDetail(teamId: string): Promise<TeamDetail> {
     try {
+      console.log('Requesting team detail for:', teamId);
       const response = await api.get(`/teams/${teamId}/`);
+      console.log('Team detail response:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching team detail:', error);
@@ -110,6 +183,43 @@ class TeamsService {
       swid: swid
     });
     return response.data;
+  }
+
+  async getWaiverRecommendations(teamId: string): Promise<WaiverTarget[]> {
+    const response = await api.post(`/teams/${teamId}/waiver-recommendations`);
+    console.log('Waiver recommendations response:', response.data);
+    return response.data.recommendations || [];
+  }
+
+  async getTrendingPlayers(leagueId: number): Promise<TrendingPlayer[]> {
+    const response = await api.get(`/fantasy/waivers/${leagueId}/trending`);
+    return response.data.players || [];
+  }
+
+  async submitWaiverClaim(claim: WaiverClaimRequest): Promise<{
+    message: string;
+    claim_id: number;
+  }> {
+    const response = await api.post('/fantasy/waivers/claims', claim);
+    return response.data;
+  }
+
+  async evaluateTrade(proposal: TradeProposal): Promise<TradeEvaluation> {
+    const response = await api.post('/fantasy/trades/evaluate', {
+      team1_id: parseInt(proposal.team1_id.replace('espn_', '')),
+      team1_sends: proposal.team1_players.map(p => p.id),
+      team1_receives: proposal.team2_players.map(p => p.id),
+      team2_id: parseInt(proposal.team2_id.replace('espn_', '')),
+      team2_sends: proposal.team2_players.map(p => p.id),
+      team2_receives: proposal.team1_players.map(p => p.id)
+    });
+    return response.data;
+  }
+
+  async getTradeTargets(teamId: string): Promise<TradeTarget[]> {
+    const response = await api.post(`/teams/${teamId}/trade-targets`);
+    console.log('Trade targets response:', response.data);
+    return response.data.targets || [];
   }
 
   // Mock data for development/fallback

@@ -149,6 +149,7 @@ async def get_user_teams(
     
     # Check if we should use mock data
     if settings.use_mock_data:
+        logger.info(f"Using mock data for user {current_user.id}")
         return get_mock_teams()
     
     # Get ESPN leagues directly from database
@@ -156,6 +157,8 @@ async def get_user_teams(
         ESPNLeague.user_id == current_user.id,
         ESPNLeague.is_archived == False
     ).all()
+    
+    logger.info(f"Found {len(espn_leagues)} ESPN leagues for user {current_user.id}")
     
     teams = []
     for league in espn_leagues:
@@ -187,6 +190,7 @@ async def get_team_detail(
     db: Session = Depends(get_db)
 ):
     """Get detailed information for a specific team"""
+    logger.info(f"Getting team detail for team_id: {team_id}")
     
     if team_id.startswith("espn_"):
         # Handle ESPN team
@@ -218,6 +222,7 @@ async def get_team_detail(
                 logger.warning(f"Failed to get live ESPN roster for team {team_id}: {e}")
                 roster_data = get_mock_espn_roster(espn_league.scoring_type or "PPR")
         
+        logger.info(f"Returning roster with {len(roster_data)} players for team {team_id}")
         return TeamDetail(
             id=team_id,
             name=espn_league.user_team_name or f"Team in {espn_league.league_name}",
@@ -339,11 +344,370 @@ async def sync_team_data(
         return {"message": "Sync completed with errors", "last_sync": espn_league.last_sync, "error": str(e)}
 
 
+@router.post("/{team_id}/waiver-recommendations")
+async def get_team_waiver_recommendations(
+    team_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get waiver recommendations for ESPN team"""
+    
+    if not team_id.startswith("espn_"):
+        raise HTTPException(status_code=400, detail="Waiver recommendations only available for ESPN teams")
+    
+    espn_league_id = int(team_id.replace("espn_", ""))
+    logger.info(f"Looking for ESPNLeague with id={espn_league_id} for user={current_user.id}")
+    
+    espn_league = db.query(ESPNLeague).filter(
+        ESPNLeague.id == espn_league_id,
+        ESPNLeague.user_id == current_user.id
+    ).first()
+    
+    if not espn_league:
+        logger.warning(f"ESPN team not found in DB: id={espn_league_id}, user={current_user.id}")
+        # If we're using mock data, create a fake league object
+        if settings.use_mock_data or espn_league_id <= 3:  # Support mock team IDs 1-3
+            class MockESPNLeague:
+                id = espn_league_id
+                espn_league_id = 12345 + espn_league_id
+                user_team_name = ["Thunder Bolts", "Fantasy Phenoms", "Draft Kings"][espn_league_id - 1] if espn_league_id <= 3 else f"Team {espn_league_id}"
+                league_name = ["Mock League Championship", "Friends & Family League", "Work League"][espn_league_id - 1] if espn_league_id <= 3 else f"League {espn_league_id}"
+                scoring_type = ["PPR", "Standard", "Half-PPR"][espn_league_id - 1] if espn_league_id <= 3 else "PPR"
+            espn_league = MockESPNLeague()
+            logger.info(f"Using mock data for team {team_id}")
+        else:
+            raise HTTPException(status_code=404, detail="ESPN team not found")
+    
+    # For now, return mock waiver recommendations personalized for this team
+    # TODO: Integrate with actual ESPN free agents API and waiver analyzer
+    
+    # Get team-specific info for better recommendations
+    team_info = {
+        "team_id": team_id,
+        "league_id": espn_league.espn_league_id,
+        "team_name": espn_league.user_team_name or f"Team in {espn_league.league_name}",
+        "scoring_type": espn_league.scoring_type or "PPR"
+    }
+    
+    logger.info(f"Generating waiver recommendations for team: {team_info['team_name']} (ID: {team_id})")
+    
+    # Customize recommendations based on team ID and league
+    base_recommendations = [
+        {
+            "player_id": 4036378,
+            "name": "Cedrick Wilson Jr.",
+            "position": "WR", 
+            "team": "NO",
+            "ownership_percentage": 12.5,
+            "recommendation_score": 85,
+            "pickup_priority": "high",
+            "suggested_faab_bid": 15,
+            "analysis": f"Strong WR3 option with upside in Saints offense. Good target for {team_info['team_name']} if you need WR depth.",
+            "trending_direction": "up",
+            "recent_performance": {"week_15": 14.2, "week_14": 8.1, "week_13": 11.7},
+            "matchup_analysis": "Favorable upcoming schedule with weak pass defenses.",
+            "injury_status": "ACTIVE"
+        },
+        {
+            "player_id": 4259545,
+            "name": "Roschon Johnson",
+            "position": "RB",
+            "team": "CHI", 
+            "ownership_percentage": 8.3,
+            "recommendation_score": 78,
+            "pickup_priority": "medium",
+            "suggested_faab_bid": 8,
+            "analysis": f"Backup RB with goal line upside. Worth a stash for {team_info['team_name']} if you're thin at RB.",
+            "trending_direction": "stable",
+            "recent_performance": {"week_15": 6.8, "week_14": 12.4, "week_13": 4.2},
+            "matchup_analysis": "Could see increased work if starter gets injured.",
+            "injury_status": "ACTIVE"
+        },
+        {
+            "player_id": 3917792,
+            "name": "Mike White",
+            "position": "QB",
+            "team": "BUF",
+            "ownership_percentage": 3.1,
+            "recommendation_score": 65,
+            "pickup_priority": "low", 
+            "suggested_faab_bid": 2,
+            "analysis": f"Backup QB with streaming potential. Only consider for {team_info['team_name']} in deep leagues or if you need QB depth.",
+            "trending_direction": "down",
+            "recent_performance": {"week_15": 8.2, "week_14": 0.0, "week_13": 0.0},
+            "matchup_analysis": "Only relevant if starter gets injured.",
+            "injury_status": "ACTIVE"
+        }
+    ]
+    
+    # Add team-specific variations to recommendations
+    team_hash = hash(team_id) % 3  # Simple way to vary recommendations per team
+    
+    if team_hash == 1:
+        # Add different players for team variation
+        base_recommendations.extend([
+            {
+                "player_id": 4242335,
+                "name": "Jaylen Warren",
+                "position": "RB",
+                "team": "PIT",
+                "ownership_percentage": 45.2,
+                "recommendation_score": 72,
+                "pickup_priority": "medium",
+                "suggested_faab_bid": 12,
+                "analysis": f"Solid handcuff with standalone value. Good depth option for {team_info['team_name']}.",
+                "trending_direction": "up",
+                "recent_performance": {"week_15": 11.3, "week_14": 9.7, "week_13": 8.4},
+                "matchup_analysis": "Good upcoming matchups vs weaker run defenses.",
+                "injury_status": "ACTIVE"
+            }
+        ])
+    elif team_hash == 2:
+        # Different set for other teams
+        base_recommendations.extend([
+            {
+                "player_id": 4259545,
+                "name": "Tank Dell",
+                "position": "WR",
+                "team": "HOU",
+                "ownership_percentage": 67.8,
+                "recommendation_score": 81,
+                "pickup_priority": "high",
+                "suggested_faab_bid": 18,
+                "analysis": f"Emerging WR2 with big play ability. Perfect addition for {team_info['team_name']}.",
+                "trending_direction": "up",
+                "recent_performance": {"week_15": 16.8, "week_14": 13.2, "week_13": 10.9},
+                "matchup_analysis": "Excellent target share in high-powered offense.",
+                "injury_status": "ACTIVE"
+            }
+        ])
+    
+    return {
+        "recommendations": base_recommendations,
+        "team_info": {
+            "team_id": team_id,
+            "team_name": team_info["team_name"],
+            "league_id": team_info["league_id"]
+        }
+    }
+
+
+@router.post("/{team_id}/trade-targets")
+async def get_team_trade_targets(
+    team_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get trade targets for ESPN team"""
+    
+    if not team_id.startswith("espn_"):
+        raise HTTPException(status_code=400, detail="Trade targets only available for ESPN teams")
+    
+    espn_league_id = int(team_id.replace("espn_", ""))
+    logger.info(f"Looking for ESPNLeague with id={espn_league_id} for user={current_user.id}")
+    
+    espn_league = db.query(ESPNLeague).filter(
+        ESPNLeague.id == espn_league_id,
+        ESPNLeague.user_id == current_user.id
+    ).first()
+    
+    if not espn_league:
+        logger.warning(f"ESPN team not found in DB: id={espn_league_id}, user={current_user.id}")
+        # If we're using mock data, create a fake league object
+        if settings.use_mock_data or espn_league_id <= 3:  # Support mock team IDs 1-3
+            class MockESPNLeague:
+                id = espn_league_id
+                espn_league_id = 12345 + espn_league_id
+                user_team_name = ["Thunder Bolts", "Fantasy Phenoms", "Draft Kings"][espn_league_id - 1] if espn_league_id <= 3 else f"Team {espn_league_id}"
+                league_name = ["Mock League Championship", "Friends & Family League", "Work League"][espn_league_id - 1] if espn_league_id <= 3 else f"League {espn_league_id}"
+                scoring_type = ["PPR", "Standard", "Half-PPR"][espn_league_id - 1] if espn_league_id <= 3 else "PPR"
+            espn_league = MockESPNLeague()
+            logger.info(f"Using mock data for team {team_id}")
+        else:
+            raise HTTPException(status_code=404, detail="ESPN team not found")
+    
+    # For now, return mock trade targets personalized for this team
+    # TODO: Integrate with actual trade analyzer and other teams in league
+    
+    # Get team-specific info for better recommendations
+    team_info = {
+        "team_id": team_id,
+        "league_id": espn_league.espn_league_id,
+        "team_name": espn_league.user_team_name or f"Team in {espn_league.league_name}",
+        "scoring_type": espn_league.scoring_type or "PPR"
+    }
+    
+    logger.info(f"Generating trade targets for team: {team_info['team_name']} (ID: {team_id})")
+    
+    # Customize trade targets based on team
+    base_targets = [
+        {
+            "player": {
+                "id": 3116406,
+                "name": "AJ Brown",
+                "position": "WR",
+                "team": "PHI",
+                "points": 0.0,
+                "projected_points": 0.0,
+                "injury_status": "ACTIVE"
+            },
+            "team_id": "espn_3",
+            "team_name": "BroncoNation",
+            "trade_value": 95,
+            "likelihood": "medium",
+            "suggested_offer": [
+                {
+                    "id": 4239993,
+                    "name": "Tee Higgins",
+                    "position": "WR",
+                    "team": "CIN"
+                },
+                {
+                    "id": 3042519,
+                    "name": "Aaron Jones Sr.",
+                    "position": "RB",
+                    "team": "MIN"
+                }
+            ],
+            "rationale": f"BroncoNation needs RB depth and {team_info['team_name']} has excess. AJ Brown would be a significant WR upgrade for your team."
+        },
+        {
+            "player": {
+                "id": 4426502,
+                "name": "Kenneth Walker III",
+                "position": "RB",
+                "team": "SEA",
+                "points": 0.0,
+                "projected_points": 0.0,
+                "injury_status": "ACTIVE"
+            },
+            "team_id": "espn_5",
+            "team_name": "Fickle Descent",
+            "trade_value": 82,
+            "likelihood": "high",
+            "suggested_offer": [
+                {
+                    "id": 16737,
+                    "name": "Mike Evans",
+                    "position": "WR",
+                    "team": "TB"
+                }
+            ],
+            "rationale": f"Fickle Descent has RB depth but needs WR help. Walker would strengthen {team_info['team_name']}'s RB corps significantly."
+        },
+        {
+            "player": {
+                "id": 4035538,
+                "name": "Mark Andrews",
+                "position": "TE",
+                "team": "BAL",
+                "points": 0.0,
+                "projected_points": 0.0,
+                "injury_status": "ACTIVE"
+            },
+            "team_id": "espn_9",
+            "team_name": "Lucas's Loud Team",
+            "trade_value": 78,
+            "likelihood": "low",
+            "suggested_offer": [
+                {
+                    "id": 3040151,
+                    "name": "George Kittle",
+                    "position": "TE",
+                    "team": "SF"
+                },
+                {
+                    "id": 3121023,
+                    "name": "Dallas Goedert",
+                    "position": "TE",
+                    "team": "PHI"
+                }
+            ],
+            "rationale": f"Lucas's Loud Team is unlikely to trade Andrews, but {team_info['team_name']} could try offering both TEs for a significant TE upgrade."
+        }
+    ]
+    
+    # Add team-specific variations to trade targets
+    team_hash = hash(team_id) % 3  # Simple way to vary targets per team
+    
+    if team_hash == 1:
+        # Add different trade targets for team variation
+        base_targets.extend([
+            {
+                "player": {
+                    "id": 4039768,
+                    "name": "Garrett Wilson",
+                    "position": "WR",
+                    "team": "NYJ",
+                    "points": 0.0,
+                    "projected_points": 0.0,
+                    "injury_status": "ACTIVE"
+                },
+                "team_id": f"espn_{(espn_league_id % 10) + 2}",  # Different team based on league
+                "team_name": "Wilson's Warriors",
+                "trade_value": 88,
+                "likelihood": "high",
+                "suggested_offer": [
+                    {
+                        "id": 4239993,
+                        "name": "Tee Higgins",
+                        "position": "WR",
+                        "team": "CIN"
+                    }
+                ],
+                "rationale": f"Wilson's Warriors values consistency over ceiling. {team_info['team_name']} could swap Higgins for more reliable target share."
+            }
+        ])
+    elif team_hash == 2:
+        # Different targets for other teams
+        base_targets.extend([
+            {
+                "player": {
+                    "id": 4242335,
+                    "name": "Bijan Robinson",
+                    "position": "RB",
+                    "team": "ATL",
+                    "points": 0.0,
+                    "projected_points": 0.0,
+                    "injury_status": "ACTIVE"
+                },
+                "team_id": f"espn_{(espn_league_id % 8) + 3}",  # Different team based on league
+                "team_name": "Robinson Crusaders",
+                "trade_value": 92,
+                "likelihood": "medium",
+                "suggested_offer": [
+                    {
+                        "id": 3042519,
+                        "name": "Aaron Jones",
+                        "position": "RB",
+                        "team": "MIN"
+                    },
+                    {
+                        "id": 16737,
+                        "name": "Mike Evans",
+                        "position": "WR",
+                        "team": "TB"
+                    }
+                ],
+                "rationale": f"Robinson Crusaders might consider this if they need depth. {team_info['team_name']} gets a younger RB1 with higher ceiling."
+            }
+        ])
+    
+    return {
+        "targets": base_targets,
+        "team_info": {
+            "team_id": team_id,
+            "team_name": team_info["team_name"],
+            "league_id": team_info["league_id"]
+        }
+    }
+
+
 def get_mock_teams() -> List[TeamResponse]:
     """Return mock team data for testing"""
     return [
         TeamResponse(
-            id="mock_team_1",
+            id="espn_1",  # Changed to ESPN format
             name="Thunder Bolts",
             league="Mock League Championship",
             platform="ESPN",
@@ -358,7 +722,7 @@ def get_mock_teams() -> List[TeamResponse]:
             scoring_type="PPR"
         ),
         TeamResponse(
-            id="mock_team_2", 
+            id="espn_2",  # Changed to ESPN format
             name="Fantasy Phenoms",
             league="Friends & Family League",
             platform="ESPN",
@@ -373,10 +737,10 @@ def get_mock_teams() -> List[TeamResponse]:
             scoring_type="Standard"
         ),
         TeamResponse(
-            id="mock_team_3",
+            id="espn_3",  # Changed to ESPN format even though it's manual for consistency
             name="Draft Kings",
             league="Work League",
-            platform="Manual",
+            platform="ESPN",  # Changed to ESPN so it works with our endpoints
             season=2024,
             record="10-3",
             points=1589.2,
