@@ -302,4 +302,84 @@ router.get('/:leagueId/free-agents', async (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/leagues/:leagueId/sync-teams
+ * Sync all teams in the league with their rosters
+ */
+router.post('/:leagueId/sync-teams', async (req, res, next) => {
+  try {
+    // Validate parameters
+    const { error: paramError, value: params } = leagueParamsSchema.validate(req.params);
+    if (paramError) {
+      return res.status(400).json({
+        error: 'Invalid parameters',
+        details: paramError.details[0].message
+      });
+    }
+
+    const { error: queryError, value: query } = seasonQuerySchema.validate(req.query);
+    if (queryError) {
+      return res.status(400).json({
+        error: 'Invalid query parameters',
+        details: queryError.details[0].message
+      });
+    }
+
+    logger.info(`Syncing teams for league ${params.leagueId} season ${query.season}`);
+
+    // Create ESPN client with request-specific cookies
+    const s2Cookie = req.headers['x-espn-s2'];
+    const swidCookie = req.headers['x-espn-swid'];
+    const clientWithCookies = new (require('../utils/espnClient'))(s2Cookie, swidCookie);
+
+    // Get all teams in the league
+    const teams = await clientWithCookies.getLeagueTeams(params.leagueId, query.season);
+    const syncedTeams = [];
+    let teamsProcessed = 0;
+    let teamsFailed = 0;
+
+    // For each team, get their roster
+    for (const team of teams) {
+      try {
+        const roster = await clientWithCookies.getTeamRoster(
+          params.leagueId,
+          team.id,
+          query.season
+        );
+
+        // Add roster to team data
+        team.roster = roster.entries || [];
+        syncedTeams.push(team);
+        teamsProcessed++;
+
+        logger.info(`Synced roster for team ${team.id} (${team.name})`);
+      } catch (error) {
+        logger.error(`Error syncing roster for team ${team.id}:`, error);
+        // Add team without roster data
+        team.roster = [];
+        syncedTeams.push(team);
+        teamsFailed++;
+      }
+    }
+
+    res.json({
+      success: true,
+      teams: syncedTeams,
+      teams_synced: teamsProcessed,
+      teams_failed: teamsFailed,
+      meta: {
+        leagueId: params.leagueId,
+        season: query.season,
+        totalTeams: teams.length,
+        syncedAt: new Date().toISOString()
+      },
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    logger.error(`Error syncing teams for league ${req.params.leagueId}:`, error);
+    next(error);
+  }
+});
+
 module.exports = router;

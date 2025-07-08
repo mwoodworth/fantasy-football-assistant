@@ -13,6 +13,7 @@ from .espn_league import (
     LeagueHistoricalData, 
     UserLeagueSettings
 )
+from .espn_team import ESPNTeam, TradeRecommendation, TeamSyncLog
 
 __all__ = [
     "Base",
@@ -32,5 +33,8 @@ __all__ = [
     "DraftSession",
     "DraftRecommendation", 
     "LeagueHistoricalData",
-    "UserLeagueSettings"
+    "UserLeagueSettings",
+    "ESPNTeam",
+    "TradeRecommendation",
+    "TeamSyncLog"
 ]

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -12,6 +12,7 @@ import { teamsService, type TeamDetail, type WaiverTarget, type TradeTarget, typ
 
 export function TeamsPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [selectedView, setSelectedView] = useState('roster');
   const [showSettings, setShowSettings] = useState(false);
@@ -141,6 +142,24 @@ export function TeamsPage() {
 
   const handleOpenTradeAnalyzer = () => {
     setSelectedView('trades');
+  };
+
+  const handleRefreshTradeTargets = async () => {
+    if (!selectedTeam) return;
+    
+    try {
+      const result = await teamsService.refreshTradeTargets(selectedTeam);
+      
+      // Invalidate and refetch trade targets
+      queryClient.invalidateQueries(['trade-targets', selectedTeam]);
+      
+      // Show success message with sync info
+      if (result.refreshInfo.teams_synced > 0) {
+        console.log(`Trade targets refreshed! Synced ${result.refreshInfo.teams_synced} teams.`);
+      }
+    } catch (error) {
+      console.error('Error refreshing trade targets:', error);
+    }
   };
 
   const handleViewTradeTarget = async (target: TradeTarget) => {
@@ -643,8 +662,8 @@ export function TeamsPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Trade Center</CardTitle>
-              <Button size="sm" variant="outline" onClick={handleOpenTradeAnalyzer}>
-                <RefreshCw className="w-4 h-4 mr-1" />
+              <Button size="sm" variant="outline" onClick={handleRefreshTradeTargets} disabled={tradeLoading}>
+                <RefreshCw className={`w-4 h-4 mr-1 ${tradeLoading ? 'animate-spin' : ''}`} />
                 Refresh Targets
               </Button>
             </div>
@@ -724,8 +743,8 @@ export function TeamsPage() {
                   }
                 </p>
                 {currentTeam?.platform === 'ESPN' && (
-                  <Button onClick={handleOpenTradeAnalyzer}>
-                    <RefreshCw className="w-4 h-4 mr-1" />
+                  <Button onClick={handleRefreshTradeTargets} disabled={tradeLoading}>
+                    <RefreshCw className={`w-4 h-4 mr-1 ${tradeLoading ? 'animate-spin' : ''}`} />
                     Refresh Targets
                   </Button>
                 )}

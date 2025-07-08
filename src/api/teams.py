@@ -14,6 +14,7 @@ from ..models.database import get_db
 from ..models.user import User
 from ..models.fantasy import League, FantasyTeam
 from ..models.espn_league import ESPNLeague
+from ..models.espn_team import ESPNTeam, TradeRecommendation
 from ..utils.dependencies import get_current_active_user
 from ..services.espn_bridge import get_espn_bridge_service
 from ..services.espn_integration import espn_service, ESPNServiceError, ESPNAuthError
@@ -498,209 +499,190 @@ async def get_team_trade_targets(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Get trade targets for ESPN team"""
+    """Get dynamic trade targets for ESPN team"""
     
     if not team_id.startswith("espn_"):
         raise HTTPException(status_code=400, detail="Trade targets only available for ESPN teams")
     
     espn_league_id = int(team_id.replace("espn_", ""))
-    logger.info(f"Looking for ESPNLeague with id={espn_league_id} for user={current_user.id}")
+    logger.info(f"Getting trade targets for team {team_id} (league ID: {espn_league_id})")
     
+    # Get ESPN league
     espn_league = db.query(ESPNLeague).filter(
         ESPNLeague.id == espn_league_id,
         ESPNLeague.user_id == current_user.id
     ).first()
     
     if not espn_league:
-        logger.warning(f"ESPN team not found in DB: id={espn_league_id}, user={current_user.id}")
-        # If we're using mock data, create a fake league object
-        if settings.use_mock_data or espn_league_id <= 3:  # Support mock team IDs 1-3
-            class MockESPNLeague:
-                id = espn_league_id
-                espn_league_id = 12345 + espn_league_id
-                user_team_name = ["Thunder Bolts", "Fantasy Phenoms", "Draft Kings"][espn_league_id - 1] if espn_league_id <= 3 else f"Team {espn_league_id}"
-                league_name = ["Mock League Championship", "Friends & Family League", "Work League"][espn_league_id - 1] if espn_league_id <= 3 else f"League {espn_league_id}"
-                scoring_type = ["PPR", "Standard", "Half-PPR"][espn_league_id - 1] if espn_league_id <= 3 else "PPR"
-            espn_league = MockESPNLeague()
-            logger.info(f"Using mock data for team {team_id}")
-        else:
-            raise HTTPException(status_code=404, detail="ESPN team not found")
+        raise HTTPException(status_code=404, detail="ESPN league not found")
     
-    # For now, return mock trade targets personalized for this team
-    # TODO: Integrate with actual trade analyzer and other teams in league
+    # Get user's team
+    user_team = db.query(ESPNTeam).filter(
+        ESPNTeam.espn_league_id == espn_league.id,
+        ESPNTeam.is_user_team == True
+    ).first()
     
-    # Get team-specific info for better recommendations
-    team_info = {
-        "team_id": team_id,
-        "league_id": espn_league.espn_league_id,
-        "team_name": espn_league.user_team_name or f"Team in {espn_league.league_name}",
-        "scoring_type": espn_league.scoring_type or "PPR"
-    }
+    if not user_team:
+        # If no user team found, sync teams first
+        logger.info(f"No user team found, syncing teams for league {espn_league.id}")
+        from ..services.team_sync import team_sync_service
+        await team_sync_service.sync_league_teams(db, espn_league, force_refresh=False)
+        
+        # Try to find user team again
+        user_team = db.query(ESPNTeam).filter(
+            ESPNTeam.espn_league_id == espn_league.id,
+            ESPNTeam.is_user_team == True
+        ).first()
+        
+        if not user_team:
+            raise HTTPException(status_code=404, detail="User team not found in league")
     
-    logger.info(f"Generating trade targets for team: {team_info['team_name']} (ID: {team_id})")
+    # Check for valid cached recommendations
+    from ..models.espn_team import TradeRecommendation
+    cached_recommendations = db.query(TradeRecommendation).filter(
+        TradeRecommendation.user_team_id == user_team.id,
+        TradeRecommendation.is_expired == False,
+        TradeRecommendation.expires_at > datetime.utcnow()
+    ).all()
     
-    # Customize trade targets based on team
-    base_targets = [
-        {
-            "player": {
-                "id": 3116406,
-                "name": "AJ Brown",
-                "position": "WR",
-                "team": "PHI",
-                "points": 0.0,
-                "projected_points": 0.0,
-                "injury_status": "ACTIVE"
+    # If we have valid cached recommendations, return them
+    if cached_recommendations:
+        logger.info(f"Found {len(cached_recommendations)} cached trade recommendations")
+        targets = [rec.to_api_response() for rec in cached_recommendations]
+        
+        return {
+            "targets": targets,
+            "team_info": {
+                "team_id": team_id,
+                "team_name": user_team.team_name,
+                "league_id": espn_league.espn_league_id
             },
-            "team_id": "espn_3",
-            "team_name": "BroncoNation",
-            "trade_value": 95,
-            "likelihood": "medium",
-            "suggested_offer": [
-                {
-                    "id": 4239993,
-                    "name": "Tee Higgins",
-                    "position": "WR",
-                    "team": "CIN"
-                },
-                {
-                    "id": 3042519,
-                    "name": "Aaron Jones Sr.",
-                    "position": "RB",
-                    "team": "MIN"
-                }
-            ],
-            "rationale": f"BroncoNation needs RB depth and {team_info['team_name']} has excess. AJ Brown would be a significant WR upgrade for your team."
-        },
-        {
-            "player": {
-                "id": 4426502,
-                "name": "Kenneth Walker III",
-                "position": "RB",
-                "team": "SEA",
-                "points": 0.0,
-                "projected_points": 0.0,
-                "injury_status": "ACTIVE"
-            },
-            "team_id": "espn_5",
-            "team_name": "Fickle Descent",
-            "trade_value": 82,
-            "likelihood": "high",
-            "suggested_offer": [
-                {
-                    "id": 16737,
-                    "name": "Mike Evans",
-                    "position": "WR",
-                    "team": "TB"
-                }
-            ],
-            "rationale": f"Fickle Descent has RB depth but needs WR help. Walker would strengthen {team_info['team_name']}'s RB corps significantly."
-        },
-        {
-            "player": {
-                "id": 4035538,
-                "name": "Mark Andrews",
-                "position": "TE",
-                "team": "BAL",
-                "points": 0.0,
-                "projected_points": 0.0,
-                "injury_status": "ACTIVE"
-            },
-            "team_id": "espn_9",
-            "team_name": "Lucas's Loud Team",
-            "trade_value": 78,
-            "likelihood": "low",
-            "suggested_offer": [
-                {
-                    "id": 3040151,
-                    "name": "George Kittle",
-                    "position": "TE",
-                    "team": "SF"
-                },
-                {
-                    "id": 3121023,
-                    "name": "Dallas Goedert",
-                    "position": "TE",
-                    "team": "PHI"
-                }
-            ],
-            "rationale": f"Lucas's Loud Team is unlikely to trade Andrews, but {team_info['team_name']} could try offering both TEs for a significant TE upgrade."
-        }
-    ]
-    
-    # Add team-specific variations to trade targets
-    team_hash = hash(team_id) % 3  # Simple way to vary targets per team
-    
-    if team_hash == 1:
-        # Add different trade targets for team variation
-        base_targets.extend([
-            {
-                "player": {
-                    "id": 4039768,
-                    "name": "Garrett Wilson",
-                    "position": "WR",
-                    "team": "NYJ",
-                    "points": 0.0,
-                    "projected_points": 0.0,
-                    "injury_status": "ACTIVE"
-                },
-                "team_id": f"espn_{(espn_league_id % 10) + 2}",  # Different team based on league
-                "team_name": "Wilson's Warriors",
-                "trade_value": 88,
-                "likelihood": "high",
-                "suggested_offer": [
-                    {
-                        "id": 4239993,
-                        "name": "Tee Higgins",
-                        "position": "WR",
-                        "team": "CIN"
-                    }
-                ],
-                "rationale": f"Wilson's Warriors values consistency over ceiling. {team_info['team_name']} could swap Higgins for more reliable target share."
+            "cache_info": {
+                "cached": True,
+                "generated_at": cached_recommendations[0].generated_at.isoformat() if cached_recommendations else None,
+                "expires_in_days": min(rec.get_days_until_expiration() for rec in cached_recommendations)
             }
-        ])
-    elif team_hash == 2:
-        # Different targets for other teams
-        base_targets.extend([
-            {
-                "player": {
-                    "id": 4242335,
-                    "name": "Bijan Robinson",
-                    "position": "RB",
-                    "team": "ATL",
-                    "points": 0.0,
-                    "projected_points": 0.0,
-                    "injury_status": "ACTIVE"
-                },
-                "team_id": f"espn_{(espn_league_id % 8) + 3}",  # Different team based on league
-                "team_name": "Robinson Crusaders",
-                "trade_value": 92,
-                "likelihood": "medium",
-                "suggested_offer": [
-                    {
-                        "id": 3042519,
-                        "name": "Aaron Jones",
-                        "position": "RB",
-                        "team": "MIN"
-                    },
-                    {
-                        "id": 16737,
-                        "name": "Mike Evans",
-                        "position": "WR",
-                        "team": "TB"
-                    }
-                ],
-                "rationale": f"Robinson Crusaders might consider this if they need depth. {team_info['team_name']} gets a younger RB1 with higher ceiling."
-            }
-        ])
-    
-    return {
-        "targets": base_targets,
-        "team_info": {
-            "team_id": team_id,
-            "team_name": team_info["team_name"],
-            "league_id": team_info["league_id"]
         }
-    }
+    
+    # No valid cache, generate new recommendations
+    logger.info("No valid cached recommendations found, generating new ones")
+    
+    try:
+        # Import here to avoid circular imports
+        from ..services.trade_analyzer_new import trade_analysis_engine
+        
+        # Generate new recommendations
+        recommendations = await trade_analysis_engine.generate_trade_recommendations(
+            db, user_team, max_recommendations=5
+        )
+        
+        # Convert to API response format
+        targets = [rec.to_api_response() for rec in recommendations]
+        
+        return {
+            "targets": targets,
+            "team_info": {
+                "team_id": team_id,
+                "team_name": user_team.team_name,
+                "league_id": espn_league.espn_league_id
+            },
+            "cache_info": {
+                "cached": False,
+                "generated_at": datetime.utcnow().isoformat(),
+                "expires_in_days": 5
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating trade recommendations: {e}")
+        # Fall back to mock data for now
+        return {
+            "targets": [],
+            "team_info": {
+                "team_id": team_id,
+                "team_name": user_team.team_name,
+                "league_id": espn_league.espn_league_id
+            },
+            "error": "Failed to generate recommendations, please try refreshing"
+        }
+
+
+@router.post("/{team_id}/trade-targets/refresh")
+async def refresh_trade_targets(
+    team_id: str,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Force refresh trade targets for ESPN team"""
+    
+    if not team_id.startswith("espn_"):
+        raise HTTPException(status_code=400, detail="Trade targets only available for ESPN teams")
+    
+    espn_league_id = int(team_id.replace("espn_", ""))
+    logger.info(f"Force refreshing trade targets for team {team_id}")
+    
+    # Get ESPN league
+    espn_league = db.query(ESPNLeague).filter(
+        ESPNLeague.id == espn_league_id,
+        ESPNLeague.user_id == current_user.id
+    ).first()
+    
+    if not espn_league:
+        raise HTTPException(status_code=404, detail="ESPN league not found")
+    
+    # Get user's team
+    user_team = db.query(ESPNTeam).filter(
+        ESPNTeam.espn_league_id == espn_league.id,
+        ESPNTeam.is_user_team == True
+    ).first()
+    
+    if not user_team:
+        raise HTTPException(status_code=404, detail="User team not found in league")
+    
+    # Sync teams first to get latest data
+    from ..services.team_sync import team_sync_service
+    sync_log = await team_sync_service.sync_league_teams(db, espn_league, force_refresh=True)
+    
+    # Expire old recommendations
+    from ..models.espn_team import TradeRecommendation
+    old_recommendations = db.query(TradeRecommendation).filter(
+        TradeRecommendation.user_team_id == user_team.id,
+        TradeRecommendation.is_expired == False
+    ).all()
+    
+    for rec in old_recommendations:
+        rec.mark_expired()
+    
+    db.commit()
+    
+    # Generate new recommendations
+    try:
+        from ..services.trade_analyzer_new import trade_analysis_engine
+        
+        recommendations = await trade_analysis_engine.generate_trade_recommendations(
+            db, user_team, max_recommendations=5
+        )
+        
+        targets = [rec.to_api_response() for rec in recommendations]
+        
+        return {
+            "targets": targets,
+            "team_info": {
+                "team_id": team_id,
+                "team_name": user_team.team_name,
+                "league_id": espn_league.espn_league_id
+            },
+            "refresh_info": {
+                "refreshed": True,
+                "teams_synced": sync_log.teams_processed,
+                "generated_at": datetime.utcnow().isoformat(),
+                "expires_in_days": 5
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error generating trade recommendations after refresh: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate recommendations after refresh")
 
 
 def get_mock_teams() -> List[TeamResponse]:

@@ -222,6 +222,23 @@ class TeamsService {
     return response.data.targets || [];
   }
 
+  async refreshTradeTargets(teamId: string): Promise<{
+    targets: TradeTarget[];
+    refreshInfo: {
+      refreshed: boolean;
+      teams_synced: number;
+      generated_at: string;
+      expires_in_days: number;
+    };
+  }> {
+    const response = await api.post(`/teams/${teamId}/trade-targets/refresh`);
+    console.log('Refresh trade targets response:', response.data);
+    return {
+      targets: response.data.targets || [],
+      refreshInfo: response.data.refresh_info || {}
+    };
+  }
+
   // Mock data for development/fallback
   private getMockTeams(): Team[] {
     return [

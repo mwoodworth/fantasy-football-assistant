@@ -407,6 +407,72 @@ class ESPNDataService:
         """Clear all cached data"""
         self._cache.clear()
         logger.info("ESPN data cache cleared")
+    
+    async def sync_league_teams(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Sync all teams in a league with their rosters"""
+        logger.info(f"Syncing teams for league {league_id}")
+        
+        try:
+            async with self.client as client:
+                # Use the new sync-teams endpoint
+                response = await client._make_request(
+                    'POST',
+                    f'/api/leagues/{league_id}/sync-teams',
+                    espn_s2=espn_s2,
+                    swid=swid,
+                    params={'season': season}
+                )
+                
+                if response.get('success'):
+                    return {
+                        'success': True,
+                        'teams': response.get('teams', []),
+                        'teams_synced': response.get('teams_synced', 0),
+                        'synced_at': response.get('meta', {}).get('syncedAt', datetime.now().isoformat())
+                    }
+                else:
+                    raise ESPNServiceError(f"Sync teams failed: {response.get('error', 'Unknown error')}")
+                    
+        except Exception as e:
+            logger.error(f"Error syncing league teams: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'teams': [],
+                'teams_synced': 0
+            }
+    
+    async def sync_single_team_roster(self, team_id: int, league_id: int, season: int = 2024, 
+                                    espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Sync a single team's roster data"""
+        logger.info(f"Syncing roster for team {team_id} in league {league_id}")
+        
+        try:
+            async with self.client as client:
+                roster_response = await client.get_team_roster(
+                    team_id, league_id, season, espn_s2=espn_s2, swid=swid
+                )
+                
+                if roster_response.get('success'):
+                    return {
+                        'success': True,
+                        'roster': roster_response.get('data', []),
+                        'synced_at': datetime.now().isoformat()
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': roster_response.get('error', 'Unknown error'),
+                        'roster': []
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error syncing team roster: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'roster': []
+            }
 
 
 # Singleton instance for use throughout the application
