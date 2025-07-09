@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Users, Play, Pause, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '../common/Card'
 import { Button } from '../common/Button'
@@ -66,11 +65,10 @@ export function DraftBoard({ sessionId: initialSessionId, leagueId }: DraftBoard
     onSuccess: (data) => {
       setActiveSessionId(data.id)
       queryClient.invalidateQueries({ queryKey: ['draft-session', leagueId] })
-      toast.success('Draft session started!')
+      console.log('Draft session started!')
     },
     onError: (error) => {
-      toast.error('Failed to start draft session')
-      console.error('Start draft error:', error)
+      console.error('Failed to start draft session:', error)
     },
   })
 
