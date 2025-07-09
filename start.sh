@@ -98,8 +98,6 @@ LOG_LEVEL="INFO"
 
 # ESPN Service Configuration
 ESPN_SERVICE_URL="http://localhost:3001"
-ESPN_COOKIE_S2=""
-ESPN_COOKIE_SWID=""
 EOF
         echo "   Basic .env file created. Edit as needed."
     fi

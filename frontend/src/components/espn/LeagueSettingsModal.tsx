@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, AlertCircle, Trash2, Archive, RefreshCw, Key, Lock } from 'lucide-react';
+import { Settings, AlertCircle, Trash2, Archive, RefreshCw, Key, Lock, Trophy, Users, Calendar, Shield } from 'lucide-react';
 import { espnService, type ESPNLeague } from '../../services/espn';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -111,18 +111,26 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
     <Modal 
       isOpen={isOpen} 
       onClose={onClose} 
-      title="League Settings"
+      title={
+        <div className="flex items-center gap-2">
+          <Settings className="h-5 w-5 text-gray-600" />
+          <span>League Settings</span>
+        </div>
+      }
       size="lg"
     >
       <div className="space-y-6">
-        {/* League Info */}
-        <Card className="bg-gray-50 p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <h3 className="font-medium text-gray-900">{league.league_name}</h3>
-              <p className="text-sm text-gray-600">
-                ESPN League ID: {league.espn_league_id} • {league.season} Season
-              </p>
+        {/* League Info Header */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-3">
+              <Trophy className="h-8 w-8 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">{league.league_name}</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  ESPN League ID: {league.espn_league_id} • {league.season} Season
+                </p>
+              </div>
             </div>
             <div className="flex gap-2">
               {getSyncStatusBadge(league.sync_status)}
@@ -130,27 +138,39 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-600">Teams:</span>
-              <span className="ml-2 font-medium">{league.team_count}</span>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Teams</p>
+                <p className="font-semibold text-gray-900">{league.team_count}</p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-600">Scoring:</span>
-              <span className="ml-2 font-medium">{espnService.formatScoreType(league.scoring_type)}</span>
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Scoring</p>
+                <p className="font-semibold text-gray-900">{espnService.formatScoreType(league.scoring_type)}</p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-600">Draft Status:</span>
-              <span className="ml-2 font-medium">
-                {league.draft_completed ? 'Completed' : 'Pending'}
-              </span>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Draft Status</p>
+                <p className="font-semibold text-gray-900">
+                  {league.draft_completed ? 'Completed' : 'Pending'}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="text-gray-600">Your Team:</span>
-              <span className="ml-2 font-medium">{league.user_team_name || 'Unknown'}</span>
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-gray-500" />
+              <div>
+                <p className="text-xs text-gray-500">Your Team</p>
+                <p className="font-semibold text-gray-900">{league.user_team_name || 'Not Set'}</p>
+              </div>
             </div>
           </div>
-        </Card>
+        </div>
 
         {/* League Name Update */}
         <div>
@@ -332,57 +352,102 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
             )}
 
             {/* Disconnect League */}
-            <Card className="p-4 border-red-200 bg-red-50">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-                <div className="flex-1">
-                  <h5 className="font-medium text-red-900 mb-2">Disconnect League</h5>
-                  <p className="text-sm text-red-800 mb-3">
-                    This will permanently disconnect this league from your account. 
-                    Historical data will be preserved but you'll need to reconnect to access it again.
-                  </p>
-                  
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm font-medium text-red-900 mb-1">
-                        Type the league name to confirm:
-                      </label>
-                      <Input
-                        type="text"
-                        value={confirmDelete}
-                        onChange={(e) => setConfirmDelete(e.target.value)}
-                        placeholder={league.league_name}
-                        className="border-red-300 focus:border-red-500 focus:ring-red-500"
-                      />
-                    </div>
-                    
-                    <Button
-                      onClick={handleDisconnect}
-                      disabled={confirmDelete !== league.league_name || disconnectMutation.isPending}
-                      className="bg-red-600 hover:bg-red-700 text-white flex items-center gap-1"
-                      size="sm"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {disconnectMutation.isPending ? 'Disconnecting...' : 'Disconnect League'}
-                    </Button>
+            <div className="border border-red-200 rounded-lg overflow-hidden">
+              <div className="bg-red-50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Trash2 className="h-5 w-5 text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-red-900 mb-1">Disconnect League</h5>
+                    <p className="text-sm text-red-700">
+                      Remove this league from your account. This action cannot be undone.
+                    </p>
                   </div>
                 </div>
               </div>
-            </Card>
+              
+              <div className="p-4 bg-white border-t border-red-200">
+                <div className="space-y-4">
+                  <div className="p-3 bg-red-50 border border-red-200 rounded text-sm">
+                    <p className="text-red-800">
+                      <strong>Warning:</strong> Disconnecting will:
+                    </p>
+                    <ul className="list-disc list-inside mt-2 text-red-700 space-y-1">
+                      <li>Remove this league from your active leagues</li>
+                      <li>Delete any saved preferences for this league</li>
+                      <li>Require re-authentication if you reconnect later</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      To confirm, type <span className="font-semibold text-red-600">"{league.league_name}"</span> below:
+                    </label>
+                    <Input
+                      type="text"
+                      value={confirmDelete}
+                      onChange={(e) => setConfirmDelete(e.target.value)}
+                      placeholder="Type league name to confirm"
+                      className={`${
+                        confirmDelete === league.league_name
+                          ? 'border-green-500 focus:border-green-600 focus:ring-green-500'
+                          : 'border-gray-300 focus:border-red-500 focus:ring-red-500'
+                      }`}
+                    />
+                    {confirmDelete && confirmDelete !== league.league_name && (
+                      <p className="text-xs text-red-600 mt-1">
+                        League name doesn't match. Please type exactly: {league.league_name}
+                      </p>
+                    )}
+                  </div>
+                  
+                  <Button
+                    onClick={handleDisconnect}
+                    disabled={confirmDelete !== league.league_name || disconnectMutation.isPending}
+                    variant="destructive"
+                    className="w-full"
+                  >
+                    {disconnectMutation.isPending ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                        Disconnecting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Disconnect League
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Error Display */}
         {(updateLeagueMutation.error || disconnectMutation.error || refreshMutation.error || updateCookiesMutation.error) && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-            <AlertCircle className="h-4 w-4" />
-            <span>
-              {updateLeagueMutation.error?.message || 
-               disconnectMutation.error?.message || 
-               refreshMutation.error?.message || 
-               updateCookiesMutation.error?.message ||
-               'An error occurred. Please try again.'}
-            </span>
+          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-red-700">
+              <p className="font-medium mb-1">Error</p>
+              <p>
+                {(() => {
+                  const error = updateLeagueMutation.error || disconnectMutation.error || 
+                               refreshMutation.error || updateCookiesMutation.error;
+                  
+                  if (error && typeof error === 'object' && 'response' in error) {
+                    const axiosError = error as { response?: { data?: { detail?: string } } };
+                    if (axiosError.response?.data?.detail) {
+                      return axiosError.response.data.detail;
+                    }
+                  }
+                  
+                  return (error as Error)?.message || 'An error occurred. Please try again.';
+                })()}
+              </p>
+            </div>
           </div>
         )}
 

@@ -235,7 +235,7 @@ async def connect_espn_league(
     if user_league_count >= max_leagues:
         raise HTTPException(
             status_code=400, 
-            detail=f"Maximum league limit reached ({max_leagues} leagues)"
+            detail="Maximum league limit reached"
         )
     
     # Check if league already connected

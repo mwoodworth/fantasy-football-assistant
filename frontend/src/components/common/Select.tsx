@@ -67,15 +67,15 @@ export function Select({
     }
   }, [isOpen, searchable]);
 
-  const filteredOptions = searchable
+  const filteredOptions = searchable && options
     ? options.filter(option =>
         option.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
         option.value.toLowerCase().includes(searchTerm.toLowerCase())
       )
-    : options;
+    : options || [];
 
   const selectedValues = Array.isArray(value) ? value : value ? [value] : [];
-  const selectedOptions = options.filter(option => selectedValues.includes(option.value));
+  const selectedOptions = (options || []).filter(option => selectedValues.includes(option.value));
 
   const handleOptionClick = (option: SelectOption) => {
     if (option.disabled) return;

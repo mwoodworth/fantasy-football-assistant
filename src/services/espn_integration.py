@@ -129,12 +129,14 @@ class ESPNServiceClient:
             params={'season': season}
         )
     
-    async def get_league_teams(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
+    async def get_league_teams(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get all teams in league"""
         return await self._make_request(
             'GET',
             f'/api/leagues/{league_id}/teams',
-            params={'season': season}
+            params={'season': season},
+            espn_s2=espn_s2,
+            swid=swid
         )
     
     async def get_league_standings(self, league_id: int, season: int = 2024) -> Dict[str, Any]:

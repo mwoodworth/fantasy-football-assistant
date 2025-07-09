@@ -64,6 +64,7 @@ class TeamResponse(BaseModel):
     playoffs: bool
     active: bool
     espn_league_id: Optional[int] = None
+    user_team_id: Optional[int] = None
     draft_completed: Optional[bool] = None
     scoring_type: Optional[str] = None
 
@@ -177,6 +178,7 @@ async def get_user_teams(
                 "playoffs": False, # Will be populated by sync
                 "active": league.is_active,
                 "espn_league_id": league.espn_league_id,
+                "user_team_id": league.user_team_id,  # Include user's team ID
                 "draft_completed": league.draft_completed,
                 "scoring_type": league.scoring_type
             })
@@ -685,54 +687,57 @@ async def refresh_trade_targets(
         raise HTTPException(status_code=500, detail="Failed to generate recommendations after refresh")
 
 
-def get_mock_teams() -> List[TeamResponse]:
+def get_mock_teams() -> List[Dict[str, Any]]:
     """Return mock team data for testing"""
     return [
-        TeamResponse(
-            id="espn_1",  # Changed to ESPN format
-            name="Thunder Bolts",
-            league="Mock League Championship",
-            platform="ESPN",
-            season=2024,
-            record="8-5",
-            points=1456.7,
-            rank="3rd",
-            playoffs=True,
-            active=True,
-            espn_league_id=12345,
-            draft_completed=True,
-            scoring_type="PPR"
-        ),
-        TeamResponse(
-            id="espn_2",  # Changed to ESPN format
-            name="Fantasy Phenoms",
-            league="Friends & Family League",
-            platform="ESPN",
-            season=2024,
-            record="6-7",
-            points=1312.4,
-            rank="7th",
-            playoffs=False,
-            active=True,
-            espn_league_id=67890,
-            draft_completed=True,
-            scoring_type="Standard"
-        ),
-        TeamResponse(
-            id="espn_3",  # Changed to ESPN format even though it's manual for consistency
-            name="Draft Kings",
-            league="Work League",
-            platform="ESPN",  # Changed to ESPN so it works with our endpoints
-            season=2024,
-            record="10-3",
-            points=1589.2,
-            rank="1st",
-            playoffs=True,
-            active=True,
-            espn_league_id=None,
-            draft_completed=None,
-            scoring_type="Half-PPR"
-        )
+        {
+            "id": "espn_1",  # Changed to ESPN format
+            "name": "Thunder Bolts",
+            "league": "Mock League Championship",
+            "platform": "ESPN",
+            "season": 2024,
+            "record": "8-5",
+            "points": 1456.7,
+            "rank": "3rd",
+            "playoffs": True,
+            "active": True,
+            "espn_league_id": 12345,
+            "user_team_id": 3,  # Team 3 is the user's selected team in this league
+            "draft_completed": True,
+            "scoring_type": "PPR"
+        },
+        {
+            "id": "espn_2",  # Changed to ESPN format
+            "name": "Fantasy Phenoms",
+            "league": "Friends & Family League",
+            "platform": "ESPN",
+            "season": 2024,
+            "record": "6-7",
+            "points": 1312.4,
+            "rank": "7th",
+            "playoffs": False,
+            "active": True,
+            "espn_league_id": 67890,
+            "user_team_id": None,  # No team selected in this league
+            "draft_completed": True,
+            "scoring_type": "Standard"
+        },
+        {
+            "id": "espn_3",  # Changed to ESPN format even though it's manual for consistency
+            "name": "Draft Kings",
+            "league": "Work League",
+            "platform": "ESPN",  # Changed to ESPN so it works with our endpoints
+            "season": 2024,
+            "record": "10-3",
+            "points": 1589.2,
+            "rank": "1st",
+            "playoffs": True,
+            "active": True,
+            "espn_league_id": None,
+            "user_team_id": None,
+            "draft_completed": None,
+            "scoring_type": "Half-PPR"
+        }
     ]
 
 

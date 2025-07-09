@@ -162,6 +162,14 @@ class ESPNService {
     return response.data;
   }
 
+  async updateESPNCookies(leagueId: number, espnS2: string, swid: string): Promise<ESPNLeague> {
+    const response = await api.put(`/espn/leagues/${leagueId}/update-cookies`, {
+      espn_s2: espnS2,
+      swid
+    });
+    return response.data;
+  }
+
   // Helper methods
   validateLeagueId(leagueId: string): boolean {
     return /^\d+$/.test(leagueId) && parseInt(leagueId) > 0;

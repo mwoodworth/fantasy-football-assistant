@@ -2,7 +2,7 @@
 ESPN Integration API endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 from pydantic import BaseModel
@@ -160,13 +160,15 @@ async def get_league_info(
 async def get_league_teams(
     league_id: int,
     season: int = Query(2024, description="NFL season year"),
+    espn_s2: Optional[str] = Header(None, alias="X-ESPN-S2"),
+    swid: Optional[str] = Header(None, alias="X-ESPN-SWID"),
     current_user: User = Depends(get_current_active_user)
 ):
     """Get all teams in ESPN league"""
     try:
-        teams_data = await espn_service.get_cached_or_fetch(
-            'get_league_teams', league_id, season
-        )
+        # Try without cookies first, then with cookies if provided
+        async with espn_service.client as client:
+            teams_data = await client.get_league_teams(league_id, season, espn_s2, swid)
         
         return {
             "success": True,

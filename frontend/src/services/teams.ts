@@ -18,6 +18,7 @@ export interface Team {
   playoffs: boolean;
   active: boolean;
   espn_league_id?: number;
+  user_team_id?: number;
   draft_completed?: boolean;
   scoring_type?: string;
 }

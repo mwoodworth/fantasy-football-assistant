@@ -8,7 +8,13 @@ const ESPNClient = require('../utils/espnClient');
 const logger = require('../utils/logger');
 
 const router = express.Router();
-const espnClient = new ESPNClient();
+
+// Helper function to create ESPN client with request-specific cookies
+function getESPNClient(req) {
+  const s2Cookie = req.headers['x-espn-s2'];
+  const swidCookie = req.headers['x-espn-swid'];
+  return new ESPNClient(s2Cookie, swidCookie);
+}
 
 // Validation schemas
 const leagueParamsSchema = Joi.object({
@@ -49,6 +55,7 @@ router.get('/:leagueId', async (req, res, next) => {
 
     logger.info(`Fetching league ${params.leagueId} for season ${query.season}`);
 
+    const espnClient = getESPNClient(req);
     const league = await espnClient.getLeague(params.leagueId, query.season);
     
     res.json({
@@ -88,6 +95,7 @@ router.get('/:leagueId/settings', async (req, res, next) => {
 
     logger.info(`Fetching league settings ${params.leagueId} for season ${query.season}`);
 
+    const espnClient = getESPNClient(req);
     const settings = await espnClient.getLeagueSettings(params.leagueId, query.season);
     
     res.json({
@@ -127,6 +135,7 @@ router.get('/:leagueId/teams', async (req, res, next) => {
 
     logger.info(`Fetching teams for league ${params.leagueId} season ${query.season}`);
 
+    const espnClient = getESPNClient(req);
     const teams = await espnClient.getLeagueTeams(params.leagueId, query.season);
     
     res.json({
@@ -167,6 +176,7 @@ router.get('/:leagueId/scoreboard', async (req, res, next) => {
 
     logger.info(`Fetching scoreboard for league ${params.leagueId} season ${query.season} week ${query.week || 'current'}`);
 
+    const espnClient = getESPNClient(req);
     const scoreboard = await espnClient.getScoreboard(params.leagueId, query.season, query.week);
     
     res.json({
@@ -212,6 +222,7 @@ router.get('/:leagueId/standings', async (req, res, next) => {
 
     logger.info(`Fetching standings for league ${params.leagueId} season ${query.season}`);
 
+    const espnClient = getESPNClient(req);
     const teams = await espnClient.getLeagueTeams(params.leagueId, query.season);
     
     // Sort teams by wins, then by points for
@@ -276,6 +287,7 @@ router.get('/:leagueId/free-agents', async (req, res, next) => {
 
     logger.info(`Fetching free agents for league ${params.leagueId} season ${query.season}`);
 
+    const espnClient = getESPNClient(req);
     const freeAgents = await espnClient.getFreeAgents(
       params.leagueId, 
       query.season, 

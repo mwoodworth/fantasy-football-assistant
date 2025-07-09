@@ -11,14 +11,14 @@ const authMiddleware = (req, res, next) => {
   const apiKey = req.headers['x-api-key'] || req.headers['authorization']?.replace('Bearer ', '');
   const expectedApiKey = process.env.API_KEY;
 
-  // Skip auth in development if no API key is configured
-  if (process.env.NODE_ENV === 'development' && !expectedApiKey) {
-    logger.warn('No API key configured, skipping authentication in development mode');
+  // Skip auth in development if no API key is configured or if it's the default value
+  if (process.env.NODE_ENV === 'development' && (!expectedApiKey || expectedApiKey === 'your_secure_api_key_here')) {
+    logger.warn('No API key configured or using default, skipping authentication in development mode');
     return next();
   }
 
-  if (!expectedApiKey) {
-    logger.error('API_KEY not configured in environment variables');
+  if (!expectedApiKey || expectedApiKey === 'your_secure_api_key_here') {
+    logger.error('API_KEY not properly configured in environment variables');
     return res.status(500).json({
       error: 'Server configuration error',
       message: 'Authentication not properly configured'

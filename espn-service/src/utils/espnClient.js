@@ -406,15 +406,15 @@ class ESPNClient {
     const { response } = error;
     
     if (response?.status === 401) {
-      return new Error('ESPN Authentication failed - check your cookies');
+      throw new Error('ESPN Authentication failed - check your cookies');
     } else if (response?.status === 403) {
-      return new Error('Access denied - league may be private or cookies invalid');
+      throw new Error('Access denied - league may be private or cookies invalid');
     } else if (response?.status === 404) {
-      return new Error('League or resource not found');
+      throw new Error('League or resource not found');
     } else if (response?.status === 429) {
-      return new Error('Rate limit exceeded - please wait before making more requests');
+      throw new Error('Rate limit exceeded - please wait before making more requests');
     } else {
-      return new Error(`ESPN API error in ${method}: ${error.message}`);
+      throw new Error(`ESPN API error in ${method}: ${error.message}`);
     }
   }
 

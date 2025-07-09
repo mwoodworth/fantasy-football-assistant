@@ -19,7 +19,7 @@ interface Team {
 }
 
 export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProps) {
-  const [formData, setFormData] = useState<LeagueConnection & { user_team_id?: number }>({
+  const [formData, setFormData] = useState<LeagueConnection>({
     espn_league_id: 0,
     season: new Date().getFullYear(),
     league_name: '',
@@ -37,88 +37,132 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
     onSuccess: () => {
       onSuccess();
     },
+    onError: (error: unknown) => {
+      console.error('Connect league error:', error);
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: unknown } };
+        console.error('Error response:', axiosError.response?.data);
+      }
+    },
   });
 
   // Auto-load teams when league ID and season are provided
   useEffect(() => {
+    const fetchTeamsDebounced = async () => {
+      if (!formData.espn_league_id || !formData.season) {
+        console.log('Skipping team fetch - missing league ID or season');
+        return;
+      }
+      
+      console.log('Fetching teams for league:', formData.espn_league_id, 'season:', formData.season);
+      
+      setLoadingTeams(true);
+      setTeamsError(null);
+      setTeams([]);
+      
+      try {
+        // Try to fetch live data from ESPN first
+        const token = localStorage.getItem('ff_access_token');
+        if (!token) {
+          console.warn('No auth token found, cannot fetch teams');
+          setTeamsError('Please log in to fetch teams from ESPN');
+          return;
+        }
+        
+        console.log('Fetching live teams data from ESPN for league:', formData.espn_league_id);
+        
+        // Build query params
+        const params = new URLSearchParams({
+          season: formData.season.toString(),
+        });
+        
+        // If user has entered ESPN cookies, pass them as headers
+        const headers: Record<string, string> = {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        };
+        
+        if (formData.espn_s2) {
+          headers['X-ESPN-S2'] = formData.espn_s2;
+        }
+        if (formData.swid) {
+          headers['X-ESPN-SWID'] = formData.swid;
+        }
+        
+        const response = await fetch(
+          `/api/espn/leagues/${formData.espn_league_id}/teams?${params.toString()}`,
+          {
+            headers,
+          }
+        );
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('API error response:', errorText);
+          
+          // Check if it's an auth error
+          if (response.status === 401) {
+            try {
+              const errorData = await response.json();
+              if (errorData.detail?.requires_auth_update) {
+                setTeamsError('This appears to be a private league. Please enter your ESPN cookies below to access team data.');
+                setShowPrivateHelp(true); // Automatically show the private league section
+              } else {
+                setTeamsError('ESPN authentication required. Please enter your ESPN cookies below.');
+                setShowPrivateHelp(true);
+              }
+            } catch {
+              setTeamsError('ESPN authentication required. Please enter your ESPN cookies below.');
+              setShowPrivateHelp(true);
+            }
+          } else {
+            throw new Error(`Failed to fetch teams: ${response.status}`);
+          }
+          return;
+        }
+        
+        const result = await response.json();
+        console.log('Teams API response:', result);
+        
+        // The backend returns { success: true, data: { data: [...teams], count: N } }
+        if (result.success && result.data) {
+          const teamsArray = result.data.data || result.data;
+          
+          if (Array.isArray(teamsArray)) {
+            const teamsData: Team[] = teamsArray.map((team: Record<string, any>, index: number) => ({
+              id: team.id || team.teamId || index + 1,
+              name: team.name || (team.location ? `${team.location} ${team.nickname}` : `Team ${index + 1}`),
+              owner: team.primaryOwner || team.owners?.[0] || team.owners || 'Unknown Owner',
+              abbreviation: team.abbrev || team.abbreviation || 'TM',
+            }));
+            console.log('Parsed teams data:', teamsData);
+            setTeams(teamsData);
+          } else {
+            console.warn('Invalid teams array format');
+            setTeamsError('Unable to parse teams data from ESPN');
+          }
+        } else {
+          console.warn('Invalid response format from API');
+          setTeamsError('Unable to parse teams data from ESPN');
+        }
+      } catch (error) {
+        console.error('Failed to fetch teams:', error);
+        setTeamsError('Failed to load teams. You can still continue without selecting a team.');
+      } finally {
+        setLoadingTeams(false);
+      }
+    };
+    
     if (formData.espn_league_id > 0 && formData.season) {
       // Debounce the API call
       const timer = setTimeout(() => {
-        fetchTeams();
+        fetchTeamsDebounced();
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [formData.espn_league_id, formData.season]);
+  }, [formData.espn_league_id, formData.season, formData.espn_s2, formData.swid]);
 
-  const fetchTeams = async () => {
-    if (!formData.espn_league_id || !formData.season) {
-      console.log('Skipping team fetch - missing league ID or season');
-      return;
-    }
-    
-    console.log('Fetching teams for league:', formData.espn_league_id, 'season:', formData.season);
-    
-    setLoadingTeams(true);
-    setTeamsError(null);
-    setTeams([]);
-    
-    try {
-      // Fetch teams from ESPN API
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.warn('No auth token found, skipping team fetch');
-        return;
-      }
-      
-      const response = await fetch(
-        `/api/espn/leagues/${formData.espn_league_id}/teams?season=${formData.season}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API error response:', errorText);
-        throw new Error(`Failed to fetch teams: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log('Teams API response:', result);
-      
-      if (result.success && result.data && Array.isArray(result.data)) {
-        const teamsData: Team[] = result.data.map((team: any, index: number) => ({
-          id: team.id || team.teamId || index + 1,
-          name: team.name || (team.location ? `${team.location} ${team.nickname}` : `Team ${index + 1}`),
-          owner: team.primaryOwner || team.owners?.[0] || 'Unknown Owner',
-          abbreviation: team.abbrev || team.abbreviation || 'TM',
-        }));
-        console.log('Parsed teams data:', teamsData);
-        setTeams(teamsData);
-      } else {
-        console.warn('Invalid response format, using mock data');
-        throw new Error('Invalid response format');
-      }
-    } catch (error) {
-      console.error('Failed to fetch teams:', error);
-      setTeamsError('Failed to load teams. You can still continue without selecting a team.');
-      
-      // Fall back to mock data if API fails
-      const mockTeams: Team[] = Array.from({ length: 10 }, (_, i) => ({
-        id: i + 1,
-        name: `Team ${i + 1}`,
-        owner: `Owner ${i + 1}`,
-        abbreviation: `T${i + 1}`,
-      }));
-      setTeams(mockTeams);
-    } finally {
-      setLoadingTeams(false);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,6 +182,7 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
       return;
     }
 
+    console.log('Submitting form data:', formData);
     connectMutation.mutate(formData);
   };
 
@@ -236,18 +281,15 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
             ) : (
               <div>
                 <Select
+                  options={teams.map((team) => ({
+                    value: team.id.toString(),
+                    label: `${team.name}${team.owner ? ` (${team.owner})` : ''}`
+                  }))}
                   value={formData.user_team_id?.toString() || ''}
                   onChange={(value) => handleInputChange('user_team_id', parseInt(value))}
+                  placeholder="Choose your team..."
                   className="w-full"
-                  required={teams.length > 0}
-                >
-                  <option value="">Choose your team...</option>
-                  {teams.map((team) => (
-                    <option key={team.id} value={team.id}>
-                      {team.name} {team.owner ? `(${team.owner})` : ''}
-                    </option>
-                  ))}
-                </Select>
+                />
                 <p className="text-xs text-green-700 mt-2">
                   This will be your default team when viewing league data
                 </p>
@@ -319,6 +361,23 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
                     <li>Find and copy "espn_s2" and "SWID" values</li>
                   </ol>
                 </div>
+                
+                {/* Retry button if cookies were just entered */}
+                {(formData.espn_s2 || formData.swid) && teams.length === 0 && !loadingTeams && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      // Trigger re-fetch by updating league ID to force effect to run
+                      const currentId = formData.espn_league_id;
+                      setFormData(prev => ({ ...prev, espn_league_id: 0 }));
+                      setTimeout(() => setFormData(prev => ({ ...prev, espn_league_id: currentId })), 0);
+                    }}
+                    variant="outline"
+                    className="w-full mt-4"
+                  >
+                    Retry Loading Teams
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -331,9 +390,32 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
             <div className="text-sm text-red-700">
               <p className="font-medium">Connection Failed</p>
               <p className="mt-1">
-                {connectMutation.error instanceof Error 
-                  ? connectMutation.error.message 
-                  : 'Please check your league ID and try again.'}
+                {(() => {
+                  const error = connectMutation.error as { response?: { data?: { detail?: string } }; message?: string };
+                  // Check for specific error messages from the backend
+                  if (error.response?.data?.detail) {
+                    const detail = error.response.data.detail;
+                    
+                    // Provide user-friendly messages for common errors
+                    switch (detail) {
+                      case 'League already connected':
+                        return 'This league is already connected to your account. You can view it in your leagues list.';
+                      case 'Maximum league limit reached':
+                        return 'You have reached the maximum number of leagues allowed. Please disconnect a league before adding a new one.';
+                      case 'Could not validate credentials':
+                        return 'Your session has expired. Please log out and log back in to continue.';
+                      default:
+                        return detail;
+                    }
+                  }
+                  
+                  // Fallback to error message
+                  if (error.message) {
+                    return error.message;
+                  }
+                  
+                  return 'Please check your league ID and try again.';
+                })()}
               </p>
             </div>
           </div>
