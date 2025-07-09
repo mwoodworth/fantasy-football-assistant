@@ -385,6 +385,45 @@ async def disconnect_league(
     return {"message": "League disconnected successfully"}
 
 
+@router.delete("/leagues/{league_id}/permanent")
+async def permanently_delete_league(
+    league_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Permanently delete an archived ESPN league"""
+    league = db.query(ESPNLeague).filter(
+        and_(
+            ESPNLeague.id == league_id,
+            ESPNLeague.user_id == current_user.id,
+            ESPNLeague.is_archived == True  # Only allow deletion of archived leagues
+        )
+    ).first()
+    
+    if not league:
+        raise HTTPException(status_code=404, detail="Archived league not found")
+    
+    # Delete all related data
+    # Delete draft sessions
+    db.query(DraftSession).filter(DraftSession.league_id == league_id).delete()
+    
+    # Delete draft recommendations
+    db.query(DraftRecommendation).filter(
+        DraftRecommendation.session_id.in_(
+            db.query(DraftSession.id).filter(DraftSession.league_id == league_id)
+        )
+    ).delete()
+    
+    # Delete historical data
+    db.query(LeagueHistoricalData).filter(LeagueHistoricalData.league_id == league_id).delete()
+    
+    # Finally delete the league
+    db.delete(league)
+    db.commit()
+    
+    return {"message": "League permanently deleted"}
+
+
 # Draft session endpoints
 @router.post("/draft/start", response_model=DraftSessionResponse)
 async def start_draft_session(

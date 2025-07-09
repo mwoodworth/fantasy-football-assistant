@@ -339,33 +339,6 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
               </div>
             </Card>
 
-            {/* Archive League */}
-            {!league.is_archived && (
-              <Card className="p-4 border-yellow-200 bg-yellow-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <Archive className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div className="flex-1">
-                      <h5 className="font-medium text-yellow-900 mb-1">Archive League</h5>
-                      <p className="text-sm text-yellow-800">
-                        Archive this league to remove it from your active leagues while preserving historical data.
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // TODO: Implement archive functionality
-                    }}
-                    className="ml-4 text-yellow-700 border-yellow-300 hover:bg-yellow-100"
-                    disabled
-                  >
-                    Archive (Coming Soon)
-                  </Button>
-                </div>
-              </Card>
-            )}
 
             {/* Disconnect League */}
             <div className="border border-red-200 rounded-lg overflow-hidden">
@@ -375,9 +348,9 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                     <Trash2 className="h-5 w-5 text-red-600" />
                   </div>
                   <div className="flex-1">
-                    <h5 className="font-semibold text-red-900 mb-1">Disconnect League</h5>
+                    <h5 className="font-semibold text-red-900 mb-1">Archive League</h5>
                     <p className="text-sm text-red-700">
-                      Remove this league from your account. This action cannot be undone.
+                      Stop syncing and move this league to archived status. You can permanently delete it later from the archived leagues view.
                     </p>
                   </div>
                 </div>
@@ -390,9 +363,10 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                       <strong>Warning:</strong> Disconnecting will:
                     </p>
                     <ul className="list-disc list-inside mt-2 text-red-700 space-y-1">
-                      <li>Remove this league from your active leagues</li>
-                      <li>Delete any saved preferences for this league</li>
-                      <li>Require re-authentication if you reconnect later</li>
+                      <li>Move this league to your archived leagues</li>
+                      <li>Stop all automatic data syncing</li>
+                      <li>Preserve historical data for reference</li>
+                      <li>Hide from your active leagues list</li>
                     </ul>
                   </div>
                   
@@ -441,7 +415,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                     ) : (
                       <>
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Disconnect League
+                        Archive & Disconnect
                       </>
                     )}
                   </Button>
@@ -499,8 +473,8 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
               </svg>
             </div>
             <div>
-              <p className="font-medium">League Disconnected Successfully</p>
-              <p className="text-sm mt-1">The league has been removed from your account.</p>
+              <p className="font-medium">League Archived Successfully</p>
+              <p className="text-sm mt-1">The league has been moved to your archived leagues and will no longer sync.</p>
             </div>
           </div>
         )}
