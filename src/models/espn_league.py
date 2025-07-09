@@ -180,6 +180,11 @@ class DraftSession(Base):
     is_active = Column(Boolean, default=True)
     is_live_synced = Column(Boolean, default=False)  # Syncing with ESPN live
     manual_mode = Column(Boolean, default=False)     # Fallback to manual entry
+    draft_status = Column(String(20), default='not_started')  # not_started, in_progress, paused, completed
+    current_pick_team_id = Column(Integer)  # Team currently on the clock
+    pick_deadline = Column(DateTime(timezone=True))  # When current pick timer expires
+    last_espn_sync = Column(DateTime(timezone=True))  # Last successful ESPN API sync
+    sync_errors = Column(JSON, default=list)  # Track sync errors
     
     # Draft data
     drafted_players = Column(JSON, default=list)  # [{player_id, pick_number, team, round}]
@@ -199,6 +204,7 @@ class DraftSession(Base):
     user = relationship("User")
     league = relationship("ESPNLeague", back_populates="draft_sessions")
     recommendations = relationship("DraftRecommendation", back_populates="session", cascade="all, delete-orphan")
+    events = relationship("DraftEvent", back_populates="session", cascade="all, delete-orphan")
 
     def get_next_pick_number(self) -> int:
         """Calculate user's next pick number"""
@@ -358,3 +364,20 @@ class LeagueHistoricalData(Base):
 
     def __repr__(self):
         return f"<LeagueHistoricalData(league={self.league_id}, season={self.season}, rank={self.user_final_rank})>"
+
+
+class DraftEvent(Base):
+    """Track draft events for real-time updates and history"""
+    __tablename__ = "draft_events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(Integer, ForeignKey("draft_sessions.id"), nullable=False)
+    event_type = Column(String(50), nullable=False)  # pick_made, draft_started, draft_paused, etc.
+    event_data = Column(JSON)  # Event-specific data
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    session = relationship("DraftSession", back_populates="events")
+    
+    def __repr__(self):
+        return f"<DraftEvent(id={self.id}, type={self.event_type}, session={self.session_id})>"

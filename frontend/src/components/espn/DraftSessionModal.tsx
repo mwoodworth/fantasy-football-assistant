@@ -17,7 +17,7 @@ interface DraftSessionModalProps {
 export function DraftSessionModal({ isOpen, onClose, league }: DraftSessionModalProps) {
   const navigate = useNavigate();
   const [draftPosition, setDraftPosition] = useState(league.user_draft_position || 1);
-  const [liveSync, setLiveSync] = useState(false);
+  const [liveSync, setLiveSync] = useState(true);
 
   // Auto-populate draft position from league data
   useEffect(() => {
@@ -78,6 +78,23 @@ export function DraftSessionModal({ isOpen, onClose, league }: DraftSessionModal
           <p className="text-xs text-gray-500 mt-1">
             Position {draftPosition} of {league.team_count} (Snake draft)
           </p>
+        </div>
+
+        {/* Live Sync Option */}
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="live-sync"
+            checked={liveSync}
+            onChange={(e) => setLiveSync(e.target.checked)}
+            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+          />
+          <label htmlFor="live-sync" className="text-sm text-gray-700">
+            Enable Live ESPN Sync
+            <span className="block text-xs text-gray-500">
+              Automatically sync picks with your ESPN draft in real-time
+            </span>
+          </label>
         </div>
 
 

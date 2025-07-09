@@ -133,6 +133,14 @@ async def startup_event():
     else:
         logger.warning("ESPN service not available - some features may be limited")
     
+    # Start draft monitor service
+    try:
+        from .services.draft_monitor import draft_monitor
+        await draft_monitor.start()
+        logger.info("Draft monitor service started")
+    except Exception as e:
+        logger.error(f"Failed to start draft monitor: {e}")
+    
     # TODO: Initialize team data
     # TODO: Set up background tasks for data updates
 
@@ -140,6 +148,15 @@ async def startup_event():
 async def shutdown_event():
     """Cleanup tasks on shutdown"""
     logger.info("Shutting down Fantasy Football Assistant...")
+    
+    # Stop draft monitor
+    try:
+        from .services.draft_monitor import draft_monitor
+        await draft_monitor.stop()
+        logger.info("Draft monitor service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping draft monitor: {e}")
+    
     stop_espn_service()
 
 # CORS middleware

@@ -496,6 +496,88 @@ async def unarchive_league(
 
 
 # Draft session endpoints
+@router.get("/draft/{session_id}/live-status")
+async def get_draft_live_status(
+    session_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get live draft status and recent picks"""
+    session = db.query(DraftSession).filter(
+        and_(
+            DraftSession.id == session_id,
+            DraftSession.user_id == current_user.id
+        )
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+    
+    # Get recent picks (last 10)
+    recent_picks = session.drafted_players[-10:] if session.drafted_players else []
+    
+    # Calculate time until next pick
+    next_pick_info = None
+    if session.available_players and isinstance(session.available_players, dict):
+        next_user_pick = session.available_players.get('next_user_pick', 0)
+        picks_until_turn = session.available_players.get('picks_until_turn', 0)
+        next_pick_info = {
+            'next_user_pick': next_user_pick,
+            'picks_until_turn': picks_until_turn,
+            'estimated_time': picks_until_turn * 90  # Assume 90 seconds per pick
+        }
+    
+    return {
+        'session_id': session.id,
+        'draft_status': session.draft_status,
+        'current_pick': session.current_pick,
+        'current_round': session.current_round,
+        'current_pick_team_id': session.current_pick_team_id,
+        'is_user_turn': session.current_pick_team_id == session.league.user_team_id if session.league else False,
+        'recent_picks': recent_picks,
+        'next_pick_info': next_pick_info,
+        'last_sync': session.last_espn_sync.isoformat() if session.last_espn_sync else None,
+        'sync_errors': session.sync_errors or []
+    }
+
+
+@router.post("/draft/{session_id}/toggle-sync")
+async def toggle_draft_sync(
+    session_id: int,
+    enable: bool = True,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Enable or disable live sync for a draft session"""
+    session = db.query(DraftSession).filter(
+        and_(
+            DraftSession.id == session_id,
+            DraftSession.user_id == current_user.id
+        )
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+    
+    session.is_live_synced = enable
+    session.last_activity = datetime.utcnow()
+    db.commit()
+    
+    # Start or stop monitoring this session
+    if enable:
+        from ..services.draft_monitor import draft_monitor
+        # The monitor will pick it up in the next polling cycle
+        logger.info(f"Enabled live sync for draft session {session_id}")
+    else:
+        logger.info(f"Disabled live sync for draft session {session_id}")
+    
+    return {
+        'message': f'Live sync {"enabled" if enable else "disabled"}',
+        'session_id': session_id,
+        'is_live_synced': session.is_live_synced
+    }
+
+
 @router.post("/draft/start", response_model=DraftSessionResponse)
 async def start_draft_session(
     draft_data: DraftSessionStart,
