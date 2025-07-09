@@ -22,7 +22,16 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
     espnS2: league.espn_s2 || '',
     swid: league.swid || ''
   });
+  const [showDisconnectSuccess, setShowDisconnectSuccess] = useState(false);
   const queryClient = useQueryClient();
+
+  // Reset state when modal closes
+  const handleClose = () => {
+    setConfirmDelete('');
+    setShowDisconnectSuccess(false);
+    setShowCookieSection(false);
+    onClose();
+  };
 
   // Update league mutation (placeholder for now)
   const updateLeagueMutation = useMutation({
@@ -33,35 +42,20 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
-      onClose();
+      handleClose();
     },
   });
 
   // Disconnect league mutation
   const disconnectMutation = useMutation({
-    mutationFn: async (leagueId: number) => {
-      console.log('Disconnect mutation called with league ID:', leagueId);
-      try {
-        const result = await espnService.disconnectLeague(leagueId);
-        console.log('Disconnect API response:', result);
-        return result;
-      } catch (error) {
-        console.error('Disconnect API error:', error);
-        if (error && typeof error === 'object' && 'response' in error) {
-          const axiosError = error as { response?: { status?: number; data?: unknown } };
-          console.error('Error status:', axiosError.response?.status);
-          console.error('Error data:', axiosError.response?.data);
-        }
-        throw error;
-      }
-    },
+    mutationFn: espnService.disconnectLeague,
     onSuccess: () => {
-      console.log('League disconnected successfully');
+      setShowDisconnectSuccess(true);
       queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
-      onClose();
-    },
-    onError: (error) => {
-      console.error('Disconnect mutation error:', error);
+      // Delay closing to show success message
+      setTimeout(() => {
+        handleClose();
+      }, 2000);
     },
   });
 
@@ -95,16 +89,8 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
   };
 
   const handleDisconnect = () => {
-    console.log('Disconnect button clicked');
-    console.log('Confirm delete:', confirmDelete);
-    console.log('League name:', league.league_name);
-    console.log('Match:', confirmDelete === league.league_name);
-    
     if (confirmDelete === league.league_name) {
-      console.log('Calling disconnect mutation for league:', league.id);
       disconnectMutation.mutate(league.id);
-    } else {
-      console.log('League name does not match - not disconnecting');
     }
   };
 
@@ -137,7 +123,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
   return (
     <Modal 
       isOpen={isOpen} 
-      onClose={onClose} 
+      onClose={handleClose} 
       title={
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5 text-gray-600" />
@@ -371,7 +357,6 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                     size="sm"
                     onClick={() => {
                       // TODO: Implement archive functionality
-                      console.log('Archive button clicked - not yet implemented');
                     }}
                     className="ml-4 text-yellow-700 border-yellow-300 hover:bg-yellow-100"
                     disabled
@@ -418,11 +403,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                     <Input
                       type="text"
                       value={confirmDelete}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setConfirmDelete(value);
-                        console.log('Confirm delete input changed:', value);
-                      }}
+                      onChange={(e) => setConfirmDelete(e.target.value)}
                       placeholder="Type league name to confirm"
                       className={`${
                         confirmDelete === league.league_name
@@ -510,9 +491,23 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
           </div>
         )}
 
+        {showDisconnectSuccess && (
+          <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-medium">League Disconnected Successfully</p>
+              <p className="text-sm mt-1">The league has been removed from your account.</p>
+            </div>
+          </div>
+        )}
+
         {/* Close Button */}
         <div className="flex justify-end pt-6 mt-6 border-t">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             Close
           </Button>
         </div>
