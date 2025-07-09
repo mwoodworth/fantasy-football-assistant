@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Clock, Users, AlertCircle, TrendingUp } from 'lucide-react'
-import { Alert, AlertDescription } from '../ui/alert'
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
-import { Badge } from '../ui/badge'
-import { Progress } from '../ui/progress'
+import { Alert, AlertDescription } from '../common/Alert'
+import { Card, CardContent, CardHeader, CardTitle } from '../common/Card'
+import { Badge } from '../common/Badge'
+import { Progress } from '../common/Progress'
 import { espnApi } from '../../api/espn'
 
 interface DraftLiveStatus {
