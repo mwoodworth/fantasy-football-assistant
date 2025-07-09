@@ -7,6 +7,8 @@ import { Switch } from '../common/Switch'
 import { Label } from '../common/Label'
 import { Alert, AlertDescription } from '../common/Alert'
 import { DraftLiveTracker } from './DraftLiveTracker'
+import { DraftBoardGrid } from './DraftBoardGrid'
+import { DraftRecommendations } from './DraftRecommendations'
 import { espnApi } from '../../api/espn'
 
 interface DraftSession {
@@ -21,6 +23,21 @@ interface DraftSession {
   next_user_pick: number
   picks_until_user_turn: number
   started_at: string
+  total_rounds: number
+  drafted_players?: any[]
+}
+
+interface LeagueInfo {
+  id: number
+  team_count: number
+  user_team_id: number
+  teams?: Team[]
+}
+
+interface Team {
+  id: number
+  name: string
+  abbreviation?: string
 }
 
 interface DraftBoardProps {
@@ -50,6 +67,16 @@ export function DraftBoard({ sessionId: initialSessionId, leagueId }: DraftBoard
       return null
     },
     enabled: true,
+  })
+
+  // Get league info for teams
+  const { data: leagueInfo } = useQuery<LeagueInfo>({
+    queryKey: ['league-info', leagueId],
+    queryFn: async () => {
+      const response = await espnApi.get(`/leagues/${leagueId}`)
+      return response.data
+    },
+    enabled: !!leagueId,
   })
 
   // Start draft session mutation
@@ -214,29 +241,35 @@ export function DraftBoard({ sessionId: initialSessionId, leagueId }: DraftBoard
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Draft Progress</CardTitle>
+              <CardTitle>Draft Board</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-10 gap-1">
-                {/* Draft grid will be implemented here */}
-                <p className="col-span-10 text-center text-gray-500 py-8">
-                  Draft board visualization coming soon...
+              {leagueInfo?.teams && session ? (
+                <DraftBoardGrid
+                  picks={session.drafted_players || []}
+                  teams={leagueInfo.teams}
+                  totalRounds={session.total_rounds || 16}
+                  currentPick={session.current_pick}
+                  userTeamId={leagueInfo.user_team_id}
+                />
+              ) : (
+                <p className="text-center text-gray-500 py-8">
+                  Loading draft board...
                 </p>
-              </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Player Rankings */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Available Players</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center text-gray-500 py-8">
-                Player rankings and recommendations coming soon...
-              </p>
-            </CardContent>
-          </Card>
+          {/* Draft Recommendations */}
+          <div className="mt-6">
+            <DraftRecommendations 
+              sessionId={session.id} 
+              onSelectPlayer={(player) => {
+                console.log('Selected player:', player)
+                // TODO: Implement player selection
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

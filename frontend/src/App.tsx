@@ -12,6 +12,7 @@ import { PlayerDetailPage } from './pages/PlayerDetailPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { ESPNLeaguesPage } from './pages/ESPNLeaguesPage';
 import { DraftRoomPage } from './pages/DraftRoomPage';
+import { DraftTest } from './pages/DraftTest';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 
@@ -60,6 +61,7 @@ function App() {
             <Route path="teams" element={<TeamsPage />} />
             <Route path="espn/leagues" element={<ESPNLeaguesPage />} />
             <Route path="espn/draft/:sessionId" element={<DraftRoomPage />} />
+            <Route path="draft-test" element={<DraftTest />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
           </Route>

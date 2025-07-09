@@ -95,6 +95,8 @@ class DraftSessionResponse(BaseModel):
     next_user_pick: int
     picks_until_user_turn: int
     started_at: datetime
+    total_rounds: int
+    drafted_players: Optional[List[Dict]] = []
 
 
 class DraftRecommendationResponse(BaseModel):
@@ -369,6 +371,59 @@ async def connect_espn_league(
         raise HTTPException(status_code=500, detail="Failed to connect league")
 
 
+@router.get("/leagues/{league_id}")
+async def get_league_details(
+    league_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get league details with teams"""
+    league = db.query(ESPNLeague).filter(
+        and_(
+            ESPNLeague.id == league_id,
+            ESPNLeague.user_id == current_user.id
+        )
+    ).first()
+    
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+    
+    # Get teams from ESPN
+    try:
+        teams_data = await espn_service.get_league_teams(
+            league.espn_league_id,
+            league.season,
+            league.espn_s2,
+            league.swid
+        )
+        
+        # Format teams for frontend
+        teams = []
+        for team in teams_data.get('teams', []):
+            teams.append({
+                'id': team.get('id'),
+                'name': team.get('name', f"Team {team.get('id')}"),
+                'abbreviation': team.get('abbrev', team.get('name', '')[:3].upper())
+            })
+        
+        return {
+            'id': league.id,
+            'team_count': league.team_count,
+            'user_team_id': league.user_team_id,
+            'teams': teams
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching teams for league {league_id}: {e}")
+        # Return basic info without teams
+        return {
+            'id': league.id,
+            'team_count': league.team_count,
+            'user_team_id': league.user_team_id,
+            'teams': []
+        }
+
+
 @router.delete("/leagues/{league_id}")
 async def disconnect_league(
     league_id: int,
@@ -618,7 +673,9 @@ async def start_draft_session(
             is_live_synced=existing_session.is_live_synced,
             next_user_pick=existing_session.get_next_pick_number(),
             picks_until_user_turn=existing_session.get_picks_until_user_turn(),
-            started_at=existing_session.started_at
+            started_at=existing_session.started_at,
+            total_rounds=existing_session.total_rounds,
+            drafted_players=existing_session.drafted_players or []
         )
     
     # Create new draft session
@@ -652,7 +709,43 @@ async def start_draft_session(
         is_live_synced=new_session.is_live_synced,
         next_user_pick=new_session.get_next_pick_number(),
         picks_until_user_turn=new_session.get_picks_until_user_turn(),
-        started_at=new_session.started_at
+        started_at=new_session.started_at,
+        total_rounds=new_session.total_rounds,
+        drafted_players=new_session.drafted_players or []
+    )
+
+
+@router.get("/draft/session/{session_id}", response_model=DraftSessionResponse)
+async def get_draft_session(
+    session_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Get draft session details"""
+    session = db.query(DraftSession).filter(
+        and_(
+            DraftSession.id == session_id,
+            DraftSession.user_id == current_user.id
+        )
+    ).first()
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+    
+    return DraftSessionResponse(
+        id=session.id,
+        session_token=session.session_token,
+        league_id=session.league_id,
+        current_pick=session.current_pick,
+        current_round=session.current_round,
+        user_pick_position=session.user_pick_position,
+        is_active=session.is_active,
+        is_live_synced=session.is_live_synced,
+        next_user_pick=session.get_next_pick_number(),
+        picks_until_user_turn=session.get_picks_until_user_turn(),
+        started_at=session.started_at,
+        total_rounds=session.total_rounds,
+        drafted_players=session.drafted_players or []
     )
 
 
@@ -666,7 +759,7 @@ async def test_draft_endpoint(
     return {"message": "Test successful", "session_id": session_id, "user_id": current_user.id}
 
 
-@router.get("/draft/{session_id}/recommendations", response_model=DraftRecommendationResponse)
+@router.get("/draft/{session_id}/recommendations")
 async def get_draft_recommendations(
     session_id: int,
     current_user: User = Depends(get_current_active_user),
@@ -690,57 +783,60 @@ async def get_draft_recommendations(
             logger.warning(f"Draft session {session_id} not found or not active for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Draft session not found")
         
-        logger.info(f"Found session {session_id}, checking existing recommendations")
+        # Get league info
+        league = db.query(ESPNLeague).filter(ESPNLeague.id == session.league_id).first()
+        if not league:
+            raise HTTPException(status_code=404, detail="League not found")
         
-        # Check for existing recommendation first
-        existing_rec = db.query(DraftRecommendation).filter(
-            and_(
-                DraftRecommendation.session_id == session_id,
-                DraftRecommendation.pick_number == session.current_pick
-            )
-        ).first()
+        logger.info(f"Generating recommendations for pick {session.current_pick}")
         
-        if existing_rec:
-            logger.info(f"Found existing recommendation {existing_rec.id}")
-            return DraftRecommendationResponse(
-                id=existing_rec.id,
-                pick_number=existing_rec.pick_number,
-                round_number=existing_rec.round_number,
-                recommended_players=existing_rec.recommended_players,
-                primary_recommendation=existing_rec.primary_recommendation,
-                strategy_reasoning=existing_rec.strategy_reasoning,
-                confidence_score=existing_rec.confidence_score,
-                recommendation_type=existing_rec.recommendation_type,
-                ai_insights=existing_rec.ai_insights or [],
-                next_pick_strategy=existing_rec.next_pick_strategy or "",
-                available_player_count=existing_rec.available_player_count or 0,
-                generated_at=existing_rec.generated_at
-            )
-        
-        # Return fallback recommendations for now
-        fallback_rec = {
-            "player_id": 9999,
-            "name": "Best Available Player",
-            "position": "FLEX", 
-            "team": "NFL",
-            "score": 85.0,
-            "reasoning": "System temporarily using fallback recommendations"
-        }
-        
-        return DraftRecommendationResponse(
-            id=0,
-            pick_number=session.current_pick,
-            round_number=session.current_round,
-            recommended_players=[fallback_rec],
-            primary_recommendation=fallback_rec,
-            strategy_reasoning="System is using fallback recommendations for testing",
-            confidence_score=0.7,
-            recommendation_type="fallback",
-            ai_insights=["System is working correctly", "Fallback mode active"],
-            next_pick_strategy="Continue with best available players",
-            available_player_count=100,
-            generated_at=datetime.utcnow()
+        # Generate recommendations using draft assistant
+        recommendations = await draft_assistant.generate_recommendations(
+            session=session,
+            league=league,
+            available_players=None  # Will use mock data
         )
+        
+        # Format response for frontend
+        formatted_recommendations = []
+        for rec in recommendations.get("recommendations", [])[:10]:
+            formatted_recommendations.append({
+                "player_id": rec["player_id"],
+                "name": rec["name"],
+                "position": rec["position"],
+                "team": rec["team"],
+                "projected_points": rec["projected_points"],
+                "vor": rec["vor"],
+                "recommendation_score": rec["recommendation_score"],
+                "tier": rec["tier"],
+                "adp": rec["adp"],
+                "reasoning": rec["reasoning"]
+            })
+        
+        return {
+            "recommendations": formatted_recommendations,
+            "ai_analysis": recommendations.get("ai_analysis", {
+                "overall_strategy": "Focus on best available player",
+                "confidence": 0.8,
+                "key_insights": ["Standard draft strategy recommended"],
+                "next_pick_strategy": "Continue building roster depth"
+            }),
+            "positional_needs": [
+                {
+                    "position": need.position,
+                    "filled": need.filled_slots,
+                    "required": need.required_slots,
+                    "need_level": need.need_level
+                }
+                for need in recommendations.get("positional_needs", [])
+            ],
+            "context": recommendations.get("context", {
+                "pick_number": session.current_pick,
+                "round": session.current_round,
+                "next_user_pick": session.get_next_pick_number(),
+                "picks_until_turn": session.get_picks_until_user_turn()
+            })
+        }
         
     except HTTPException:
         raise
@@ -749,30 +845,34 @@ async def get_draft_recommendations(
         logger.error(f"Error in recommendations function: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         
-        # Return fallback response instead of 500 error
-        fallback_rec = {
-            "player_id": 9998,
-            "name": "System Error - Manual Pick Required",
-            "position": "FLEX", 
-            "team": "NFL",
-            "score": 50.0,
-            "reasoning": f"System error: {str(e)[:100]}"
+        # Return fallback response
+        return {
+            "recommendations": [{
+                "player_id": 9999,
+                "name": "Best Available Player",
+                "position": "FLEX",
+                "team": "NFL",
+                "projected_points": 150.0,
+                "vor": 10.0,
+                "recommendation_score": 85.0,
+                "tier": 2,
+                "adp": session.current_pick if session else 1,
+                "reasoning": "System error - using fallback recommendations"
+            }],
+            "ai_analysis": {
+                "overall_strategy": "Focus on best available player",
+                "confidence": 0.5,
+                "key_insights": ["System temporarily using fallback recommendations"],
+                "next_pick_strategy": "Continue with best available approach"
+            },
+            "positional_needs": [],
+            "context": {
+                "pick_number": session.current_pick if session else 1,
+                "round": session.current_round if session else 1,
+                "next_user_pick": session.get_next_pick_number() if session else -1,
+                "picks_until_turn": session.get_picks_until_user_turn() if session else 0
+            }
         }
-        
-        return DraftRecommendationResponse(
-            id=0,
-            pick_number=1,
-            round_number=1,
-            recommended_players=[fallback_rec],
-            primary_recommendation=fallback_rec,
-            strategy_reasoning="System error occurred",
-            confidence_score=0.1,
-            recommendation_type="error_fallback",
-            ai_insights=["System error occurred", "Manual analysis required"],
-            next_pick_strategy="Contact support if issues persist",
-            available_player_count=0,
-            generated_at=datetime.utcnow()
-        )
 
 
 @router.post("/draft/{session_id}/pick")
