@@ -39,14 +39,29 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
 
   // Disconnect league mutation
   const disconnectMutation = useMutation({
-    mutationFn: espnService.disconnectLeague,
+    mutationFn: async (leagueId: number) => {
+      console.log('Disconnect mutation called with league ID:', leagueId);
+      try {
+        const result = await espnService.disconnectLeague(leagueId);
+        console.log('Disconnect API response:', result);
+        return result;
+      } catch (error) {
+        console.error('Disconnect API error:', error);
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { status?: number; data?: unknown } };
+          console.error('Error status:', axiosError.response?.status);
+          console.error('Error data:', axiosError.response?.data);
+        }
+        throw error;
+      }
+    },
     onSuccess: () => {
       console.log('League disconnected successfully');
       queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
       onClose();
     },
     onError: (error) => {
-      console.error('Failed to disconnect league:', error);
+      console.error('Disconnect mutation error:', error);
     },
   });
 
@@ -435,6 +450,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                     disabled={confirmDelete !== league.league_name || disconnectMutation.isPending}
                     variant="destructive"
                     className="w-full"
+                    title={confirmDelete !== league.league_name ? 'Please type the league name to confirm' : 'Click to disconnect league'}
                   >
                     {disconnectMutation.isPending ? (
                       <>
