@@ -41,8 +41,12 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
   const disconnectMutation = useMutation({
     mutationFn: espnService.disconnectLeague,
     onSuccess: () => {
+      console.log('League disconnected successfully');
       queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
       onClose();
+    },
+    onError: (error) => {
+      console.error('Failed to disconnect league:', error);
     },
   });
 
@@ -76,8 +80,16 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
   };
 
   const handleDisconnect = () => {
+    console.log('Disconnect button clicked');
+    console.log('Confirm delete:', confirmDelete);
+    console.log('League name:', league.league_name);
+    console.log('Match:', confirmDelete === league.league_name);
+    
     if (confirmDelete === league.league_name) {
+      console.log('Calling disconnect mutation for league:', league.id);
       disconnectMutation.mutate(league.id);
+    } else {
+      console.log('League name does not match - not disconnecting');
     }
   };
 
@@ -342,10 +354,14 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={handleDisconnect}
+                    onClick={() => {
+                      // TODO: Implement archive functionality
+                      console.log('Archive button clicked - not yet implemented');
+                    }}
                     className="ml-4 text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+                    disabled
                   >
-                    Archive
+                    Archive (Coming Soon)
                   </Button>
                 </div>
               </Card>
@@ -382,22 +398,34 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      To confirm, type <span className="font-semibold text-red-600">"{league.league_name}"</span> below:
+                      To confirm, type <span className="font-semibold text-red-600 bg-red-50 px-1 py-0.5 rounded">"{league.league_name}"</span> below:
                     </label>
                     <Input
                       type="text"
                       value={confirmDelete}
-                      onChange={(e) => setConfirmDelete(e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setConfirmDelete(value);
+                        console.log('Confirm delete input changed:', value);
+                      }}
                       placeholder="Type league name to confirm"
                       className={`${
                         confirmDelete === league.league_name
                           ? 'border-green-500 focus:border-green-600 focus:ring-green-500'
-                          : 'border-gray-300 focus:border-red-500 focus:ring-red-500'
+                          : confirmDelete 
+                            ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
+                            : 'border-gray-300 focus:border-red-500 focus:ring-red-500'
                       }`}
                     />
                     {confirmDelete && confirmDelete !== league.league_name && (
-                      <p className="text-xs text-red-600 mt-1">
-                        League name doesn't match. Please type exactly: {league.league_name}
+                      <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        League name doesn't match. Please type exactly: <span className="font-mono bg-red-50 px-1">{league.league_name}</span>
+                      </p>
+                    )}
+                    {confirmDelete === league.league_name && (
+                      <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                        ✓ League name matches - you can now disconnect
                       </p>
                     )}
                   </div>
