@@ -43,7 +43,7 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
   const [liveData, setLiveData] = useState<Partial<DraftLiveStatus>>({})
 
   // Poll for initial data and as fallback
-  const { data: mergedStatus, isError, error, refetch } = useQuery<DraftLiveStatus>({
+  const { data: liveStatus, isError, error, refetch } = useQuery<DraftLiveStatus>({
     queryKey: ['draft-live-status', sessionId],
     queryFn: async () => {
       const response = await espnApi.get(`/draft/${sessionId}/live-status`)
