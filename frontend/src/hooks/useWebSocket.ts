@@ -32,7 +32,8 @@ export function useWebSocket({
     if (!draftSessionId || !user) return;
 
     // Connect to WebSocket server
-    const socket = io(import.meta.env.VITE_WS_URL || 'ws://localhost:6001', {
+    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:6001', {
+      path: '/socket.io',
       transports: ['websocket', 'polling'],
       auth: {
         token: localStorage.getItem('auth_token'),

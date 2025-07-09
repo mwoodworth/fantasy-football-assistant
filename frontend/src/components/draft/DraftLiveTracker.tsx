@@ -94,7 +94,7 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
   })
 
   // Merge polling data with WebSocket updates
-  const mergedStatus = { ...mergedStatus, ...liveData } as DraftLiveStatus
+  const mergedStatus = { ...liveStatus, ...liveData } as DraftLiveStatus
 
   // Handle user turn notification
   useEffect(() => {

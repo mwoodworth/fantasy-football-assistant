@@ -185,9 +185,8 @@ static_path = Path(__file__).parent.parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-# Mount Socket.IO app
-socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
-app = socket_app
+# Mount Socket.IO on a specific path
+app.mount("/socket.io", socketio.ASGIApp(sio))
 
 # Health check endpoint
 @app.get("/health")
