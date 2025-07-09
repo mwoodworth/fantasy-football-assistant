@@ -243,6 +243,14 @@ fantasy-football-assistant/
 - [ ] Docker containerization
 - [ ] CI/CD pipeline setup
 
+### Phase 6.5: Live ESPN Draft Integration
+- [ ] Real-time draft monitoring via ESPN API polling
+- [ ] WebSocket implementation for live updates
+- [ ] Automatic pick detection and synchronization
+- [ ] Enhanced draft UI with live draft board
+- [ ] Draft notifications and alerts
+- **📋 See detailed implementation plan**: [docs/live-draft-implementation-plan.md](docs/live-draft-implementation-plan.md)
+
 ### Phase 7: Enhanced Features
 - [ ] Mobile app (React Native)
 - [ ] Push notifications for important updates
