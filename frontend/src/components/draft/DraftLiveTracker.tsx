@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../common/Card'
 import { Badge } from '../common/Badge'
 import { Progress } from '../common/Progress'
 import { espnApi } from '../../api/espn'
-// import { useWebSocket } from '../../hooks/useWebSocket' // Temporarily disabled until socket.io-client is installed
+import { useWebSocket } from '../../hooks/useWebSocket'
 
 interface DraftLiveStatus {
   session_id: number
@@ -49,14 +49,11 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
       const response = await espnApi.get(`/draft/${sessionId}/live-status`)
       return response.data
     },
-    refetchInterval: 5000, // Poll every 5 seconds (WebSocket temporarily disabled)
+    refetchInterval: 30000, // Reduced polling to 30s as WebSocket is primary
     enabled: true,
   })
 
   // WebSocket connection for real-time updates
-  // Temporarily disabled until socket.io-client is installed
-  const isConnected = false
-  /*
   const { isConnected } = useWebSocket({
     draftSessionId: sessionId,
     onPickMade: (data) => {
@@ -95,7 +92,6 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
       console.error('Sync error via WebSocket:', data)
     },
   })
-  */
 
   // Merge polling data with WebSocket updates
   const mergedStatus = { ...liveStatus, ...liveData } as DraftLiveStatus
