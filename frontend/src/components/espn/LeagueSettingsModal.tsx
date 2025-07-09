@@ -119,7 +119,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
       }
       size="lg"
     >
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* League Info Header */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-100">
           <div className="flex items-start justify-between mb-4">
@@ -467,7 +467,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
         )}
 
         {/* Close Button */}
-        <div className="flex justify-end pt-4 border-t">
+        <div className="flex justify-end pt-6 mt-6 border-t">
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
