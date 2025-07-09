@@ -52,7 +52,12 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
   }, [formData.espn_league_id, formData.season]);
 
   const fetchTeams = async () => {
-    if (!formData.espn_league_id || !formData.season) return;
+    if (!formData.espn_league_id || !formData.season) {
+      console.log('Skipping team fetch - missing league ID or season');
+      return;
+    }
+    
+    console.log('Fetching teams for league:', formData.espn_league_id, 'season:', formData.season);
     
     setLoadingTeams(true);
     setTeamsError(null);
@@ -60,30 +65,42 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
     
     try {
       // Fetch teams from ESPN API
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.warn('No auth token found, skipping team fetch');
+        return;
+      }
+      
       const response = await fetch(
         `/api/espn/leagues/${formData.espn_league_id}/teams?season=${formData.season}`,
         {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
       
       if (!response.ok) {
-        throw new Error('Failed to fetch teams');
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to fetch teams: ${response.status}`);
       }
       
       const result = await response.json();
+      console.log('Teams API response:', result);
       
-      if (result.success && result.data) {
-        const teamsData: Team[] = result.data.map((team: any) => ({
-          id: team.id,
-          name: team.name || team.location + ' ' + team.nickname,
-          owner: team.primaryOwner || team.owners?.[0],
-          abbreviation: team.abbrev,
+      if (result.success && result.data && Array.isArray(result.data)) {
+        const teamsData: Team[] = result.data.map((team: any, index: number) => ({
+          id: team.id || team.teamId || index + 1,
+          name: team.name || (team.location ? `${team.location} ${team.nickname}` : `Team ${index + 1}`),
+          owner: team.primaryOwner || team.owners?.[0] || 'Unknown Owner',
+          abbreviation: team.abbrev || team.abbreviation || 'TM',
         }));
+        console.log('Parsed teams data:', teamsData);
         setTeams(teamsData);
       } else {
+        console.warn('Invalid response format, using mock data');
         throw new Error('Invalid response format');
       }
     } catch (error) {
@@ -131,9 +148,10 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
     }));
   };
 
-  return (
-    <div className="space-y-6 p-6">
-      <form onSubmit={handleSubmit} className="space-y-6">
+  try {
+    return (
+      <div className="space-y-6 p-6">
+        <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic League Information */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
@@ -150,7 +168,17 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
               <Input
                 type="number"
                 value={formData.espn_league_id || ''}
-                onChange={(e) => handleInputChange('espn_league_id', parseInt(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    handleInputChange('espn_league_id', 0);
+                  } else {
+                    const parsed = parseInt(value);
+                    if (!isNaN(parsed)) {
+                      handleInputChange('espn_league_id', parsed);
+                    }
+                  }
+                }}
                 placeholder="123456789"
                 required
                 className="w-full"
@@ -338,5 +366,14 @@ export function ConnectLeagueForm({ onSuccess, onCancel }: ConnectLeagueFormProp
         </div>
       </form>
     </div>
-  );
+    );
+  } catch (error) {
+    console.error('Error rendering ConnectLeagueForm:', error);
+    return (
+      <div className="p-6 text-red-600">
+        <p>An error occurred while rendering the form. Please refresh the page.</p>
+        <p className="text-sm mt-2">Error: {error instanceof Error ? error.message : 'Unknown error'}</p>
+      </div>
+    );
+  }
 }
