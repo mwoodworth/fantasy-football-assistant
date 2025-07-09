@@ -49,6 +49,14 @@ An AI-powered fantasy football assistant that provides intelligent draft strateg
 - **Waiver Wire Intelligence**: Prioritized pickup targets with strategic reasoning
 - **Injury Monitoring**: Real-time updates with fantasy impact assessment
 
+### 🔄 Live Draft Integration (NEW!)
+- **ESPN Integration**: Connect and sync with ESPN fantasy leagues
+- **Real-time Draft Tracking**: WebSocket-powered live draft updates
+- **Instant Pick Notifications**: Get notified when it's your turn
+- **Draft Board Visualization**: See all picks in an organized grid
+- **AI Draft Recommendations**: Smart pick suggestions based on team needs
+- **See Implementation Plan**: [docs/live-draft-implementation-plan.md](docs/live-draft-implementation-plan.md)
+
 ### 🔄 Data Integration
 - **ESPN Integration**: Real-time player statistics and league data
 - **ML Pipeline**: XGBoost and scikit-learn models for predictions
@@ -122,23 +130,39 @@ npm install
 alembic upgrade head
 ```
 
-5. Run the application:
+5. Check dependencies (optional but recommended):
+   ```bash
+   # Check all dependencies
+   ./scripts/check_dependencies.sh
+   ```
 
-   **Option 1: Use the startup script (recommended)**
+6. Run the application:
+
+   **Option 1: Use the WebSocket-enabled startup script (recommended)**
+   ```bash
+   python3 scripts/start_with_websockets.py
+   ```
+   This script will:
+   - Check and install missing dependencies
+   - Enable WebSocket support if disabled
+   - Start both backend and frontend servers
+   - Show real-time status updates
+   
+   **Option 2: Use the basic startup script**
    ```bash
    ./start.sh
    ```
    
-   **Option 2: Run services manually**
+   **Option 3: Run services manually**
    ```bash
-   # Terminal 1: Backend API
+   # Terminal 1: Backend API with WebSocket support
    uvicorn src.main:app --reload --port 6001
    
    # Terminal 2: Frontend
    cd frontend && npm run dev
    ```
 
-6. Access the application:
+7. Access the application:
 - **Frontend**: http://localhost:5173
 - **API Documentation**: http://localhost:6001/docs
 - **Health Check**: http://localhost:6001/health
@@ -147,6 +171,39 @@ alembic upgrade head
 For development, you can register a new account or use:
 - **Email**: test@example.com
 - **Password**: TestPassword123!
+
+## Troubleshooting
+
+### WebSocket Connection Issues
+If WebSocket features aren't working:
+
+1. **Check dependencies**:
+   ```bash
+   ./scripts/check_dependencies.sh
+   ```
+
+2. **Fix npm permissions** (if needed):
+   ```bash
+   sudo chown -R $(whoami) ~/.npm
+   ```
+
+3. **Reinstall frontend dependencies**:
+   ```bash
+   cd frontend
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+4. **Use the WebSocket startup script**:
+   ```bash
+   python3 scripts/start_with_websockets.py
+   ```
+
+### Common Issues
+- **"socket.io-client not found"**: Run `cd frontend && npm install socket.io-client`
+- **npm permission errors**: Fix with `sudo chown -R $(whoami) ~/.npm`
+- **WebSocket not connecting**: Check that backend is running on port 6001
+- **Draft updates not real-time**: Ensure WebSocket icon shows green (connected)
 
 ## Project Structure
 
@@ -172,10 +229,16 @@ fantasy-football-assistant/
 │   │   └── ...
 │   ├── models/             # Database models
 │   ├── services/           # Business logic
-│   │   └── ai/            # AI service modules
+│   │   ├── ai/            # AI service modules
+│   │   ├── draft_monitor.py  # ESPN draft polling service
+│   │   └── websocket_server.py # Socket.IO server
 │   └── main.py            # FastAPI application
+├── scripts/                # Utility scripts
+│   ├── start_with_websockets.py  # WebSocket-enabled startup
+│   ├── check_dependencies.sh     # Dependency checker
+│   └── clear_leagues.py          # Database utilities
 ├── tests/                  # Test files
-├── start.sh               # Startup script
+├── start.sh               # Basic startup script
 └── README.md             # This file
 ```
 
