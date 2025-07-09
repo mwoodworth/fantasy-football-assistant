@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Calendar, Users, Trophy, Settings, Trash2, Play } from 'lucide-react';
+import { Plus, Calendar, Users, Trophy, Settings, Trash2, Play, RotateCcw } from 'lucide-react';
 import { espnService, type ESPNLeague } from '../services/espn';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -32,9 +32,38 @@ export function ESPNLeaguesPage() {
     },
   });
 
+  // Unarchive league mutation
+  const unarchiveMutation = useMutation({
+    mutationFn: espnService.unarchiveLeague,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
+    },
+  });
+
+  // Permanently delete league mutation
+  const permanentDeleteMutation = useMutation({
+    mutationFn: espnService.permanentlyDeleteLeague,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
+    },
+  });
+
   const handleDisconnectLeague = async (leagueId: number) => {
     if (confirm('Are you sure you want to disconnect this league? This will archive the league but preserve historical data.')) {
       disconnectMutation.mutate(leagueId);
+    }
+  };
+
+  const handleUnarchiveLeague = async (leagueId: number) => {
+    if (confirm('Are you sure you want to reactivate this league? It will start syncing data again.')) {
+      unarchiveMutation.mutate(leagueId);
+    }
+  };
+
+  const handlePermanentDelete = async (leagueId: number, leagueName: string) => {
+    const confirmText = prompt(`To permanently delete this league, type "${leagueName}" below:`);
+    if (confirmText === leagueName) {
+      permanentDeleteMutation.mutate(leagueId);
     }
   };
 
@@ -175,7 +204,28 @@ export function ESPNLeaguesPage() {
                   Settings
                 </Button>
 
-                {!league.is_archived && (
+                {league.is_archived ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleUnarchiveLeague(league.id)}
+                      className="flex items-center gap-1 text-green-600 hover:text-green-700"
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reactivate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePermanentDelete(league.id, league.league_name)}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </Button>
+                  </>
+                ) : (
                   <Button
                     size="sm"
                     variant="outline"
@@ -183,7 +233,7 @@ export function ESPNLeaguesPage() {
                     className="flex items-center gap-1 text-red-600 hover:text-red-700"
                   >
                     <Trash2 className="h-3 w-3" />
-                    Disconnect
+                    Archive
                   </Button>
                 )}
               </div>

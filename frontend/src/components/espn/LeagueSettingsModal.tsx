@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, AlertCircle, Trash2, Archive, RefreshCw, Key, Lock, Trophy, Users, Calendar, Shield } from 'lucide-react';
+import { Settings, AlertCircle, Trash2, Archive, RefreshCw, Key, Lock, Trophy, Users, Calendar, Shield, RotateCcw } from 'lucide-react';
 import { espnService, type ESPNLeague } from '../../services/espn';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -340,8 +340,40 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
             </Card>
 
 
-            {/* Disconnect League */}
-            <div className="border border-red-200 rounded-lg overflow-hidden">
+            {/* Disconnect/Reactivate League */}
+            {league.is_archived ? (
+              <Card className="p-4 border-green-200 bg-green-50">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3">
+                    <RotateCcw className="h-5 w-5 text-green-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h5 className="font-medium text-green-900 mb-1">Reactivate League</h5>
+                      <p className="text-sm text-green-800">
+                        Restore this league to active status and resume automatic data syncing.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await espnService.unarchiveLeague(league.id);
+                        queryClient.invalidateQueries({ queryKey: ['espn-leagues'] });
+                        handleClose();
+                      } catch (error) {
+                        console.error('Failed to reactivate league:', error);
+                      }
+                    }}
+                    className="ml-4 text-green-700 border-green-300 hover:bg-green-100"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reactivate
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div className="border border-red-200 rounded-lg overflow-hidden">
               <div className="bg-red-50 p-4">
                 <div className="flex items-start gap-3">
                   <div className="p-2 bg-red-100 rounded-lg">
@@ -422,6 +454,7 @@ export function LeagueSettingsModal({ isOpen, onClose, league }: LeagueSettingsM
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
 

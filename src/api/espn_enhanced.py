@@ -424,6 +424,41 @@ async def permanently_delete_league(
     return {"message": "League permanently deleted"}
 
 
+@router.put("/leagues/{league_id}/unarchive")
+async def unarchive_league(
+    league_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Unarchive/reconnect an ESPN league"""
+    league = db.query(ESPNLeague).filter(
+        and_(
+            ESPNLeague.id == league_id,
+            ESPNLeague.user_id == current_user.id,
+            ESPNLeague.is_archived == True
+        )
+    ).first()
+    
+    if not league:
+        raise HTTPException(status_code=404, detail="Archived league not found")
+    
+    # Reactivate the league
+    league.is_archived = False
+    league.is_active = True
+    league.sync_enabled = True
+    league.archived_at = None
+    league.sync_status = 'active'
+    
+    db.commit()
+    db.refresh(league)
+    
+    return {
+        "message": "League reactivated successfully",
+        "league_id": league.id,
+        "league_name": league.league_name
+    }
+
+
 # Draft session endpoints
 @router.post("/draft/start", response_model=DraftSessionResponse)
 async def start_draft_session(

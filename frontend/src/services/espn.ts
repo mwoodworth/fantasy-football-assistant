@@ -132,6 +132,11 @@ class ESPNService {
     return response.data;
   }
 
+  async unarchiveLeague(leagueId: number): Promise<{ message: string; league_id: number; league_name: string }> {
+    const response = await api.put(`/espn/leagues/${leagueId}/unarchive`);
+    return response.data;
+  }
+
   async updateESPNCookies(leagueId: number, espnS2: string, swid: string): Promise<{ message: string; league_id: number; validation_status: string }> {
     const response = await api.put(`/espn/leagues/${leagueId}/update-cookies`, {
       espn_s2: espnS2,
