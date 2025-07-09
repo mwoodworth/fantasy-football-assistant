@@ -38,6 +38,7 @@ class ESPNLeagueConnection(BaseModel):
     league_name: Optional[str] = Field(None, description="Custom league name")
     espn_s2: Optional[str] = Field(None, description="ESPN S2 cookie for private leagues")
     swid: Optional[str] = Field(None, description="ESPN SWID for private leagues")
+    user_team_id: Optional[int] = Field(None, description="User's team ID in the league")
     
     @validator('season')
     def validate_season(cls, v):
@@ -328,7 +329,7 @@ async def connect_espn_league(
             is_private=bool(league_data.espn_s2 or league_data.swid),
             espn_s2=league_data.espn_s2,  # TODO: Encrypt these
             swid=league_data.swid,        # TODO: Encrypt these
-            user_team_id=league_info.get('user_team_id'),
+            user_team_id=league_data.user_team_id or league_info.get('user_team_id'),
             user_team_name=league_info.get('user_team_name'),
             user_team_abbreviation=league_info.get('user_team_abbreviation'),
             sync_status='active'

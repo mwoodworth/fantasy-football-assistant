@@ -80,6 +80,9 @@ export function TeamsPage() {
   // Set initial selected team when teams load
   useEffect(() => {
     if (teams.length > 0 && !selectedTeam) {
+      // Try to find a team with user_team_id set (indicating it's the user's selected team)
+      // This would require the API to return this information
+      // For now, just select the first team
       setSelectedTeam(teams[0].id);
       console.log('Selected team ID:', teams[0].id, 'Team name:', teams[0].name);
     }

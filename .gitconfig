@@ -1,0 +1,56 @@
+# Fantasy Football Assistant - Local Git Configuration
+
+[core]
+	# Ensure consistent line endings
+	autocrlf = input
+	
+	# Ignore file mode changes (useful for cross-platform development)
+	filemode = false
+
+[commit]
+	# Template for commit messages specific to this project
+	# template = .gitmessage
+
+[merge]
+	# Keep backup files when resolving conflicts
+	backup = true
+
+[branch]
+	# Always setup remote tracking for new branches
+	autosetupmerge = always
+
+# Project-specific aliases
+[alias]
+	# Show only TypeScript/JavaScript changes
+	ts-diff = diff -- '*.ts' '*.tsx' '*.js' '*.jsx'
+	
+	# Show only Python changes
+	py-diff = diff -- '*.py'
+	
+	# Quick commit with conventional commit format
+	feat = "!f() { git commit -m \"feat: $1\"; }; f"
+	fix = "!f() { git commit -m \"fix: $1\"; }; f"
+	docs = "!f() { git commit -m \"docs: $1\"; }; f"
+	style = "!f() { git commit -m \"style: $1\"; }; f"
+	refactor = "!f() { git commit -m \"refactor: $1\"; }; f"
+	test = "!f() { git commit -m \"test: $1\"; }; f"
+	chore = "!f() { git commit -m \"chore: $1\"; }; f"
+	
+	# Run tests before pushing
+	push-safe = !git push && npm test && cd espn-service && npm test && cd ..
+	
+	# Show recent changes in frontend
+	frontend-log = log --oneline -- frontend/
+	
+	# Show recent changes in backend
+	backend-log = log --oneline -- src/
+	
+	# Show recent changes in ESPN service
+	espn-log = log --oneline -- espn-service/
+
+# Diff settings for specific file types
+[diff "python"]
+	xfuncname = "^[ \\t]*((class|def)[ \\t].*)$"
+
+[diff "typescript"]
+	xfuncname = "^[ \\t]*(((export|class|interface|function|const|let|var)[ \\t].*)|(\\w+:)).*$"

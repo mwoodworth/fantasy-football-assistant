@@ -32,6 +32,7 @@ export interface LeagueConnection {
   league_name?: string;
   espn_s2?: string;
   swid?: string;
+  user_team_id?: number;
 }
 
 export interface DraftSession {
