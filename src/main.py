@@ -17,11 +17,13 @@ import os
 import signal
 import atexit
 import time
+import socketio
 
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
 from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router, teams_router
+from .services.websocket_server import create_socket_app, sio
 
 # Configure logging
 logging.basicConfig(
@@ -182,6 +184,10 @@ app.include_router(teams_router, prefix="/api")
 static_path = Path(__file__).parent.parent / "static"
 if static_path.exists():
     app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
+
+# Mount Socket.IO app
+socket_app = socketio.ASGIApp(sio, other_asgi_app=app)
+app = socket_app
 
 # Health check endpoint
 @app.get("/health")

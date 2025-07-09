@@ -12,6 +12,12 @@ from ..models.database import SessionLocal
 from ..models.espn_league import DraftSession, ESPNLeague
 from ..models.user import User
 from .espn_integration import espn_service, ESPNServiceError
+from .websocket_server import (
+    emit_pick_made,
+    emit_user_on_clock,
+    emit_draft_status_change,
+    emit_sync_error
+)
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -119,9 +125,13 @@ class DraftMonitor:
             
         except ESPNServiceError as e:
             logger.error(f"ESPN service error syncing session {session.id}: {e}")
+            # Emit sync error to connected clients
+            await emit_sync_error(str(session.id), f"ESPN API error: {str(e)}")
             # Don't mark session as failed on API errors - might be temporary
         except Exception as e:
             logger.error(f"Error syncing draft session {session.id}: {e}")
+            # Emit sync error to connected clients
+            await emit_sync_error(str(session.id), f"Sync error: {str(e)}")
             # Consider marking session as having sync issues
             
     async def _process_draft_data(self, session: DraftSession, draft_data: Dict, db: Session):
@@ -135,7 +145,11 @@ class DraftMonitor:
             logger.info(f"Draft completed for session {session.id}")
             session.is_active = False
             session.completed_at = datetime.utcnow()
+            session.draft_status = 'completed'
             db.commit()
+            
+            # Emit draft completed event
+            await emit_draft_status_change(str(session.id), 'completed')
             return
             
         if not in_progress:
@@ -202,7 +216,16 @@ class DraftMonitor:
             
         db.commit()
         
-        # TODO: Emit WebSocket event for real-time updates
+        # Emit WebSocket event for real-time updates
+        await emit_pick_made(str(session.id), {
+            'pick_number': pick['overallPickNumber'],
+            'player_id': pick.get('playerId'),
+            'team_id': pick.get('teamId'),
+            'round': pick.get('roundId'),
+            'round_pick': pick.get('roundPickNumber'),
+            'is_user_pick': pick['teamId'] == league.user_team_id if league else False
+        })
+        
         logger.info(f"Processed pick #{pick['overallPickNumber']} in session {session.id}")
         
     async def _update_current_pick(self, session: DraftSession, current_pick_info: Dict, db: Session):
@@ -233,6 +256,12 @@ class DraftMonitor:
             session.available_players = session.available_players or {}
             session.available_players['next_user_pick'] = user_next_pick
             session.available_players['picks_until_turn'] = max(0, user_next_pick - current_pick_num)
+            
+            # Emit event if it's user's turn
+            if current_pick_num == user_next_pick:
+                league = db.query(ESPNLeague).filter(ESPNLeague.id == session.league_id).first()
+                if league:
+                    await emit_user_on_clock(str(session.id), str(session.user_id))
             
         db.commit()
         

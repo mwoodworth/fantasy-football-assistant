@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Clock, Users, AlertCircle, TrendingUp } from 'lucide-react'
+import { Clock, Users, AlertCircle, TrendingUp, Wifi } from 'lucide-react'
 import { Alert, AlertDescription } from '../common/Alert'
 import { Card, CardContent, CardHeader, CardTitle } from '../common/Card'
 import { Badge } from '../common/Badge'
 import { Progress } from '../common/Progress'
 import { espnApi } from '../../api/espn'
+import { useWebSocket } from '../../hooks/useWebSocket'
 
 interface DraftLiveStatus {
   session_id: number
@@ -39,21 +40,65 @@ interface DraftLiveTrackerProps {
 export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProps) {
   const [lastUserTurn, setLastUserTurn] = useState(false)
   const [timeUntilPick, setTimeUntilPick] = useState<number | null>(null)
+  const [liveData, setLiveData] = useState<Partial<DraftLiveStatus>>({})
 
-  // Poll for draft updates every 5 seconds
-  const { data: liveStatus, isError, error } = useQuery<DraftLiveStatus>({
+  // Poll for initial data and as fallback
+  const { data: mergedStatus, isError, error, refetch } = useQuery<DraftLiveStatus>({
     queryKey: ['draft-live-status', sessionId],
     queryFn: async () => {
       const response = await espnApi.get(`/draft/${sessionId}/live-status`)
       return response.data
     },
-    refetchInterval: 5000, // Poll every 5 seconds
+    refetchInterval: 30000, // Reduced polling to 30s as WebSocket is primary
     enabled: true,
   })
 
+  // WebSocket connection for real-time updates
+  const { isConnected } = useWebSocket({
+    draftSessionId: sessionId,
+    onPickMade: (data) => {
+      console.log('Pick made via WebSocket:', data)
+      // Update recent picks
+      setLiveData(prev => ({
+        ...prev,
+        recent_picks: [
+          ...(prev.recent_picks || []).slice(-9), // Keep last 9
+          {
+            player_id: data.player_id,
+            player_name: data.player_name || 'Unknown Player',
+            position: data.position || 'N/A',
+            team: data.team || 'N/A',
+            pick_number: data.pick_number,
+            drafted_by_user: data.is_user_pick || false,
+          }
+        ],
+        current_pick: data.pick_number + 1,
+        current_round: data.round,
+      }))
+      // Refetch full data to sync
+      refetch()
+    },
+    onUserOnClock: (data) => {
+      console.log('User on clock via WebSocket:', data)
+      setLiveData(prev => ({ ...prev, is_user_turn: true }))
+      onUserTurn?.()
+    },
+    onStatusChange: (data) => {
+      console.log('Draft status change via WebSocket:', data)
+      setLiveData(prev => ({ ...prev, draft_status: data.status }))
+      refetch()
+    },
+    onSyncError: (data) => {
+      console.error('Sync error via WebSocket:', data)
+    },
+  })
+
+  // Merge polling data with WebSocket updates
+  const mergedStatus = { ...mergedStatus, ...liveData } as DraftLiveStatus
+
   // Handle user turn notification
   useEffect(() => {
-    if (liveStatus?.is_user_turn && !lastUserTurn) {
+    if (mergedStatus?.is_user_turn && !lastUserTurn) {
       onUserTurn?.()
       // Play notification sound if available
       const audio = new Audio('/sounds/your-turn.mp3')
@@ -61,12 +106,12 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
         // Ignore audio play errors
       })
     }
-    setLastUserTurn(liveStatus?.is_user_turn || false)
-  }, [liveStatus?.is_user_turn, lastUserTurn, onUserTurn])
+    setLastUserTurn(mergedStatus?.is_user_turn || false)
+  }, [mergedStatus?.is_user_turn, lastUserTurn, onUserTurn])
 
   // Update countdown timer
   useEffect(() => {
-    if (liveStatus?.next_pick_info?.estimated_time) {
+    if (mergedStatus?.next_pick_info?.estimated_time) {
       const interval = setInterval(() => {
         setTimeUntilPick((prev) => {
           if (prev === null || prev <= 0) return null
@@ -74,11 +119,11 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
         })
       }, 1000)
 
-      setTimeUntilPick(liveStatus.next_pick_info.estimated_time)
+      setTimeUntilPick(mergedStatus.next_pick_info.estimated_time)
 
       return () => clearInterval(interval)
     }
-  }, [liveStatus?.next_pick_info?.estimated_time])
+  }, [mergedStatus?.next_pick_info?.estimated_time])
 
   if (isError) {
     return (
@@ -91,7 +136,7 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
     )
   }
 
-  if (!liveStatus) {
+  if (!mergedStatus || !mergedStatus) {
     return (
       <div className="flex items-center justify-center p-4">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -143,9 +188,14 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Live Draft Status</CardTitle>
-            <Badge className={`${getDraftStatusColor(liveStatus.draft_status)} text-white`}>
-              {liveStatus.draft_status.replace('_', ' ').toUpperCase()}
+            <CardTitle className="text-lg flex items-center gap-2">
+              Live Draft Status
+              {isConnected && (
+                <Wifi className="h-4 w-4 text-green-600" title="Real-time updates active" />
+              )}
+            </CardTitle>
+            <Badge className={`${getDraftStatusColor(mergedStatus.draft_status)} text-white`}>
+              {mergedStatus.draft_status.replace('_', ' ').toUpperCase()}
             </Badge>
           </div>
         </CardHeader>
@@ -153,28 +203,28 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
               <p className="text-sm text-gray-600">Current Pick</p>
-              <p className="text-2xl font-bold">{liveStatus.current_pick}</p>
+              <p className="text-2xl font-bold">{mergedStatus.current_pick}</p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Round</p>
-              <p className="text-2xl font-bold">{liveStatus.current_round}</p>
+              <p className="text-2xl font-bold">{mergedStatus.current_round}</p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Your Next Pick</p>
               <p className="text-2xl font-bold">
-                {liveStatus.next_pick_info?.next_user_pick || '-'}
+                {mergedStatus.next_pick_info?.next_user_pick || '-'}
               </p>
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Picks Until Turn</p>
               <p className="text-2xl font-bold">
-                {liveStatus.next_pick_info?.picks_until_turn || '-'}
+                {mergedStatus.next_pick_info?.picks_until_turn || '-'}
               </p>
             </div>
           </div>
 
           {/* Progress to next pick */}
-          {liveStatus.next_pick_info && liveStatus.next_pick_info.picks_until_turn > 0 && (
+          {mergedStatus.next_pick_info && mergedStatus.next_pick_info.picks_until_turn > 0 && (
             <div className="mt-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600">Progress to your pick</span>
@@ -184,8 +234,8 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
               </div>
               <Progress
                 value={
-                  ((liveStatus.next_pick_info.next_user_pick - liveStatus.current_pick) /
-                    liveStatus.next_pick_info.picks_until_turn) *
+                  ((mergedStatus.next_pick_info.next_user_pick - mergedStatus.current_pick) /
+                    mergedStatus.next_pick_info.picks_until_turn) *
                   100
                 }
                 className="h-2"
@@ -194,7 +244,7 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
           )}
 
           {/* User turn alert */}
-          {liveStatus.is_user_turn && (
+          {mergedStatus.is_user_turn && (
             <Alert className="mt-4 border-green-500 bg-green-50">
               <AlertCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800 font-medium">
@@ -215,12 +265,12 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {liveStatus.recent_picks.length === 0 ? (
+            {mergedStatus.recent_picks.length === 0 ? (
               <p className="text-sm text-gray-500 text-center py-4">
                 No picks made yet
               </p>
             ) : (
-              liveStatus.recent_picks.map((pick) => (
+              mergedStatus.recent_picks.map((pick) => (
                 <div
                   key={pick.pick_number}
                   className={`flex items-center justify-between p-2 rounded-lg ${
@@ -254,20 +304,35 @@ export function DraftLiveTracker({ sessionId, onUserTurn }: DraftLiveTrackerProp
       </Card>
 
       {/* Sync Status */}
-      {liveStatus.sync_errors.length > 0 && (
+      {mergedStatus.sync_errors.length > 0 && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Sync errors: {liveStatus.sync_errors.join(', ')}
+            Sync errors: {mergedStatus.sync_errors.join(', ')}
           </AlertDescription>
         </Alert>
       )}
 
-      {liveStatus.last_sync && (
-        <p className="text-xs text-gray-500 text-center">
-          Last synced: {new Date(liveStatus.last_sync).toLocaleTimeString()}
-        </p>
-      )}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <span className="flex items-center gap-1">
+          {isConnected ? (
+            <>
+              <Wifi className="h-3 w-3 text-green-600" />
+              Real-time updates active
+            </>
+          ) : (
+            <>
+              <Wifi className="h-3 w-3 text-gray-400" />
+              Connecting...
+            </>
+          )}
+        </span>
+        {mergedStatus.last_sync && (
+          <span>
+            Last synced: {new Date(mergedStatus.last_sync).toLocaleTimeString()}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
