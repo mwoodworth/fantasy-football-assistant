@@ -312,6 +312,17 @@ async def connect_espn_league(
         except Exception as e:
             logger.warning(f"Could not fetch draft position for league {league_data.espn_league_id}: {e}")
 
+        # Check if draft has been completed based on draft results
+        draft_completed = False
+        if draft_results and 'success' in draft_results and draft_results['success']:
+            draft_data = draft_results.get('data', {})
+            picks = draft_data.get('picks', [])
+            total_rounds = draft_data.get('totalRounds', 16)
+            expected_picks = league_info.get('size', 10) * total_rounds
+            # If we have all picks, draft is complete
+            if len(picks) >= expected_picks:
+                draft_completed = True
+        
         # Create new league record
         new_league = ESPNLeague(
             user_id=current_user.id,
@@ -325,6 +336,7 @@ async def connect_espn_league(
             scoring_settings=league_info.get('scoring_settings', {}),
             scoring_type=league_info.get('scoring_type', 'standard'),
             draft_date=league_info.get('draft_date'),
+            draft_completed=draft_completed,
             user_draft_position=user_draft_position,
             is_private=bool(league_data.espn_s2 or league_data.swid),
             espn_s2=league_data.espn_s2,  # TODO: Encrypt these
@@ -422,6 +434,30 @@ async def permanently_delete_league(
     db.commit()
     
     return {"message": "League permanently deleted"}
+
+
+@router.post("/leagues/{league_id}/sync")
+async def sync_league(
+    league_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Manually trigger league data sync"""
+    league = db.query(ESPNLeague).filter(
+        and_(
+            ESPNLeague.id == league_id,
+            ESPNLeague.user_id == current_user.id
+        )
+    ).first()
+    
+    if not league:
+        raise HTTPException(status_code=404, detail="League not found")
+    
+    # Trigger background sync
+    background_tasks.add_task(sync_league_data, league_id)
+    
+    return {"message": "League sync initiated"}
 
 
 @router.put("/leagues/{league_id}/unarchive")
@@ -882,8 +918,49 @@ async def get_draft_status(
 # Helper functions
 async def sync_league_data(league_id: int):
     """Background task to sync league data from ESPN"""
-    # TODO: Implement ESPN data sync
-    pass
+    from ..models.database import SessionLocal
+    
+    db = SessionLocal()
+    try:
+        # Get the league
+        league = db.query(ESPNLeague).filter(ESPNLeague.id == league_id).first()
+        if not league:
+            logger.error(f"League {league_id} not found for sync")
+            return
+        
+        # Get draft results if not already marked as completed
+        if not league.draft_completed:
+            try:
+                draft_results = await espn_service.get_draft_results(
+                    league.espn_league_id,
+                    league.season
+                )
+                
+                if draft_results and draft_results.get('success'):
+                    draft_data = draft_results.get('data', {})
+                    picks = draft_data.get('picks', [])
+                    total_rounds = draft_data.get('totalRounds', 16)
+                    expected_picks = league.team_count * total_rounds
+                    
+                    # Update draft status if complete
+                    if len(picks) >= expected_picks:
+                        league.draft_completed = True
+                        league.last_sync = datetime.utcnow()
+                        db.commit()
+                        logger.info(f"Updated league {league_id} draft status to completed")
+                        
+            except Exception as e:
+                logger.warning(f"Could not sync draft status for league {league_id}: {e}")
+        
+        # Update last sync time
+        league.last_sync = datetime.utcnow()
+        db.commit()
+        
+    except Exception as e:
+        logger.error(f"Error syncing league {league_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
 
 async def generate_draft_recommendations(session: DraftSession, db: Session) -> DraftRecommendation:
