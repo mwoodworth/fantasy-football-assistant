@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, TrendingUp, TrendingDown, Activity, Users, AlertCircle, Zap, Target, LineChart } from 'lucide-react';
+import { Star, TrendingUp, TrendingDown, Activity, Users, AlertCircle, Zap, Target, LineChart, Scale } from 'lucide-react';
 import type { Player } from '../../types/player';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -11,6 +11,7 @@ interface PlayerCardProps {
   player: Player;
   viewMode: 'grid' | 'list';
   onPlayerClick?: (player: Player) => void;
+  onCompare?: (player: Player) => void;
   showActions?: boolean;
 }
 
@@ -34,7 +35,8 @@ const INJURY_STATUS_COLORS = {
 export function PlayerCard({ 
   player, 
   viewMode, 
-  onPlayerClick, 
+  onPlayerClick,
+  onCompare, 
   showActions = true 
 }: PlayerCardProps) {
   const [isFavorite, setIsFavorite] = useState(false);
@@ -135,6 +137,18 @@ export function PlayerCard({
           {/* Actions */}
           {showActions && (
             <div className="flex items-center space-x-2">
+              {onCompare && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCompare(player);
+                  }}
+                  className="p-2 rounded-md transition-colors text-gray-400 hover:text-gray-600 hover:bg-gray-50"
+                  title="Compare player"
+                >
+                  <Scale className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={toggleFavorite}
                 className={cn(

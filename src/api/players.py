@@ -405,3 +405,37 @@ async def sync_league_players(
             status_code=500,
             detail=f"Failed to sync league players: {str(e)}"
         )
+
+
+@router.post("/sync/player/{player_id}")
+async def sync_single_player(
+    player_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Manually sync a single player from ESPN"""
+    
+    try:
+        from ..services.background_sync import background_sync
+        
+        result = await background_sync.sync_player_by_id(player_id)
+        
+        if result['success']:
+            return {
+                "message": "Player synced successfully",
+                "player_id": result['player_id'],
+                "player_name": result['player_name']
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=result.get('error', 'Failed to sync player')
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to sync player: {str(e)}"
+        )

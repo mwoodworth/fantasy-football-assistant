@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Filter, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Filter, TrendingUp, TrendingDown, RefreshCw, Scale } from 'lucide-react';
 import { PlayerService } from '../services/players';
 import type { Player } from '../types/player';
 import { PlayerCard } from '../components/players/PlayerCard';
 import { PlayerFilters } from '../components/players/PlayerFilters';
 import { PlayerSearchInput } from '../components/players/PlayerSearchInput';
 import { PlayerDetailsModal } from '../components/players/PlayerDetailsModal';
+import { PlayerComparison } from '../components/players/PlayerComparison';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
@@ -29,6 +30,11 @@ export function PlayersPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [selectedPlayerIndex, setSelectedPlayerIndex] = useState<number>(-1);
   const [showTrending, setShowTrending] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [comparisonPlayers, setComparisonPlayers] = useState<{ player1: Player | null; player2: Player | null }>({
+    player1: null,
+    player2: null,
+  });
   
   const queryClient = useQueryClient();
   const { selectedLeague } = useESPNStore();
@@ -105,6 +111,25 @@ export function PlayersPage() {
     }
   };
 
+  const handleComparePlayer = (player: Player) => {
+    if (!comparisonPlayers.player1) {
+      setComparisonPlayers({ player1: player, player2: null });
+      setShowComparison(true);
+    } else if (!comparisonPlayers.player2 && player.id !== comparisonPlayers.player1.id) {
+      setComparisonPlayers({ ...comparisonPlayers, player2: player });
+    }
+  };
+
+  const handleSelectComparisonPlayer = (position: 1 | 2) => {
+    // This will be called from the comparison modal to select a player
+    // For now, we'll just clear that position
+    if (position === 1) {
+      setComparisonPlayers({ ...comparisonPlayers, player1: null });
+    } else {
+      setComparisonPlayers({ ...comparisonPlayers, player2: null });
+    }
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -150,6 +175,16 @@ export function PlayersPage() {
           >
             {showTrending ? <TrendingDown className="w-4 h-4 mr-2" /> : <TrendingUp className="w-4 h-4 mr-2" />}
             Trending
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowComparison(!showComparison)}
+            className={cn(showComparison && 'bg-primary-50 text-primary-700')}
+          >
+            <Scale className="w-4 h-4 mr-2" />
+            Compare
           </Button>
           
           <Button
@@ -285,6 +320,7 @@ export function PlayersPage() {
               player={player}
               viewMode={viewMode}
               onPlayerClick={handlePlayerClick}
+              onCompare={handleComparePlayer}
             />
           ))}
         </div>
@@ -313,6 +349,18 @@ export function PlayersPage() {
         onPrevious={handlePreviousPlayer}
         hasNext={players ? selectedPlayerIndex < players.length - 1 : false}
         hasPrevious={selectedPlayerIndex > 0}
+      />
+
+      {/* Player Comparison Modal */}
+      <PlayerComparison
+        isOpen={showComparison}
+        onClose={() => {
+          setShowComparison(false);
+          setComparisonPlayers({ player1: null, player2: null });
+        }}
+        player1={comparisonPlayers.player1}
+        player2={comparisonPlayers.player2}
+        onSelectPlayer={handleSelectComparisonPlayer}
       />
     </div>
   );

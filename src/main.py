@@ -146,8 +146,14 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start draft monitor: {e}")
     
-    # TODO: Initialize team data
-    # TODO: Set up background tasks for data updates
+    # Start background sync service (can be enabled via BACKGROUND_SYNC_ENABLED env var)
+    if os.getenv('BACKGROUND_SYNC_ENABLED', 'false').lower() == 'true':
+        try:
+            from .services.background_sync import background_sync
+            await background_sync.start()
+            logger.info("Background sync service started")
+        except Exception as e:
+            logger.error(f"Failed to start background sync: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -161,6 +167,15 @@ async def shutdown_event():
         logger.info("Draft monitor service stopped")
     except Exception as e:
         logger.error(f"Error stopping draft monitor: {e}")
+    
+    # Stop background sync service if running
+    if os.getenv('BACKGROUND_SYNC_ENABLED', 'false').lower() == 'true':
+        try:
+            from .services.background_sync import background_sync
+            await background_sync.stop()
+            logger.info("Background sync service stopped")
+        except Exception as e:
+            logger.error(f"Error stopping background sync: {e}")
     
     stop_espn_service()
 
