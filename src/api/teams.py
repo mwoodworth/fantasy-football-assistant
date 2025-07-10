@@ -381,9 +381,6 @@ async def get_team_waiver_recommendations(
         else:
             raise HTTPException(status_code=404, detail="ESPN team not found")
     
-    # For now, return mock waiver recommendations personalized for this team
-    # TODO: Integrate with actual ESPN free agents API and waiver analyzer
-    
     # Get team-specific info for better recommendations
     team_info = {
         "team_id": team_id,
@@ -394,105 +391,92 @@ async def get_team_waiver_recommendations(
     
     logger.info(f"Generating waiver recommendations for team: {team_info['team_name']} (ID: {team_id})")
     
-    # Customize recommendations based on team ID and league
-    base_recommendations = [
-        {
-            "player_id": 4036378,
-            "name": "Cedrick Wilson Jr.",
-            "position": "WR", 
-            "team": "NO",
-            "ownership_percentage": 12.5,
-            "recommendation_score": 85,
-            "pickup_priority": "high",
-            "suggested_faab_bid": 15,
-            "analysis": f"Strong WR3 option with upside in Saints offense. Good target for {team_info['team_name']} if you need WR depth.",
-            "trending_direction": "up",
-            "recent_performance": {"week_15": 14.2, "week_14": 8.1, "week_13": 11.7},
-            "matchup_analysis": "Favorable upcoming schedule with weak pass defenses.",
-            "injury_status": "ACTIVE"
-        },
-        {
-            "player_id": 4259545,
-            "name": "Roschon Johnson",
-            "position": "RB",
-            "team": "CHI", 
-            "ownership_percentage": 8.3,
-            "recommendation_score": 78,
-            "pickup_priority": "medium",
-            "suggested_faab_bid": 8,
-            "analysis": f"Backup RB with goal line upside. Worth a stash for {team_info['team_name']} if you're thin at RB.",
-            "trending_direction": "stable",
-            "recent_performance": {"week_15": 6.8, "week_14": 12.4, "week_13": 4.2},
-            "matchup_analysis": "Could see increased work if starter gets injured.",
-            "injury_status": "ACTIVE"
-        },
-        {
-            "player_id": 3917792,
-            "name": "Mike White",
-            "position": "QB",
-            "team": "BUF",
-            "ownership_percentage": 3.1,
-            "recommendation_score": 65,
-            "pickup_priority": "low", 
-            "suggested_faab_bid": 2,
-            "analysis": f"Backup QB with streaming potential. Only consider for {team_info['team_name']} in deep leagues or if you need QB depth.",
-            "trending_direction": "down",
-            "recent_performance": {"week_15": 8.2, "week_14": 0.0, "week_13": 0.0},
-            "matchup_analysis": "Only relevant if starter gets injured.",
-            "injury_status": "ACTIVE"
-        }
-    ]
-    
-    # Add team-specific variations to recommendations
-    team_hash = hash(team_id) % 3  # Simple way to vary recommendations per team
-    
-    if team_hash == 1:
-        # Add different players for team variation
-        base_recommendations.extend([
-            {
-                "player_id": 4242335,
-                "name": "Jaylen Warren",
-                "position": "RB",
-                "team": "PIT",
-                "ownership_percentage": 45.2,
-                "recommendation_score": 72,
-                "pickup_priority": "medium",
-                "suggested_faab_bid": 12,
-                "analysis": f"Solid handcuff with standalone value. Good depth option for {team_info['team_name']}.",
-                "trending_direction": "up",
-                "recent_performance": {"week_15": 11.3, "week_14": 9.7, "week_13": 8.4},
-                "matchup_analysis": "Good upcoming matchups vs weaker run defenses.",
-                "injury_status": "ACTIVE"
+    # Fetch real free agents from ESPN
+    try:
+        from ..services.espn_integration import espn_service
+        
+        # Get free agents from ESPN
+        free_agents = await espn_service.get_free_agents(
+            league_id=espn_league.espn_league_id,
+            season=espn_league.season if hasattr(espn_league, 'season') else 2024,
+            limit=50,
+            espn_s2=espn_league.espn_s2 if hasattr(espn_league, 'espn_s2') else None,
+            swid=espn_league.swid if hasattr(espn_league, 'swid') else None
+        )
+        
+        # Convert ESPN data to our waiver recommendation format
+        recommendations = []
+        if free_agents and 'players' in free_agents:
+            for player in free_agents['players'][:20]:  # Top 20 free agents
+                player_info = player.get('player', {})
+                
+                # Calculate recommendation score based on ownership and projections
+                ownership_pct = player_info.get('ownership', {}).get('percentOwned', 0)
+                projected_points = player_info.get('stats', [{}])[0].get('appliedTotal', 0.0) if player_info.get('stats') else 0.0
+                
+                # Simple scoring: higher projection + lower ownership = better pickup
+                recommendation_score = min(100, int(projected_points * 5 + (100 - ownership_pct) / 2))
+                
+                # Determine priority
+                if recommendation_score >= 80:
+                    priority = "high"
+                    faab_bid = 15 + int((recommendation_score - 80) / 2)
+                elif recommendation_score >= 60:
+                    priority = "medium"
+                    faab_bid = 8 + int((recommendation_score - 60) / 4)
+                else:
+                    priority = "low"
+                    faab_bid = max(1, int(recommendation_score / 10))
+                
+                # Get position
+                position = player_info.get('defaultPositionId', 'FLEX')
+                if isinstance(position, int):
+                    position_map = {1: 'QB', 2: 'RB', 3: 'WR', 4: 'TE', 5: 'K', 16: 'D/ST'}
+                    position = position_map.get(position, 'FLEX')
+                
+                recommendation = {
+                    "player_id": player_info.get('id', 0),
+                    "name": player_info.get('fullName', 'Unknown'),
+                    "position": position,
+                    "team": player_info.get('proTeamId', 'FA'),
+                    "ownership_percentage": ownership_pct,
+                    "recommendation_score": recommendation_score,
+                    "pickup_priority": priority,
+                    "suggested_faab_bid": faab_bid,
+                    "analysis": f"Available in {100 - ownership_pct:.1f}% of leagues. Projected for {projected_points:.1f} points.",
+                    "trending_direction": "up" if ownership_pct > 10 else "stable",
+                    "recent_performance": {},  # TODO: Add recent game stats
+                    "matchup_analysis": f"Projected {projected_points:.1f} points this week",
+                    "injury_status": player_info.get('injuryStatus', 'ACTIVE')
+                }
+                
+                recommendations.append(recommendation)
+        
+        # Sort by recommendation score
+        recommendations.sort(key=lambda x: x['recommendation_score'], reverse=True)
+        
+        return {
+            "recommendations": recommendations[:10],  # Return top 10
+            "team_info": {
+                "team_id": team_id,
+                "team_name": team_info["team_name"],
+                "league_id": team_info["league_id"]
             }
-        ])
-    elif team_hash == 2:
-        # Different set for other teams
-        base_recommendations.extend([
-            {
-                "player_id": 4259545,
-                "name": "Tank Dell",
-                "position": "WR",
-                "team": "HOU",
-                "ownership_percentage": 67.8,
-                "recommendation_score": 81,
-                "pickup_priority": "high",
-                "suggested_faab_bid": 18,
-                "analysis": f"Emerging WR2 with big play ability. Perfect addition for {team_info['team_name']}.",
-                "trending_direction": "up",
-                "recent_performance": {"week_15": 16.8, "week_14": 13.2, "week_13": 10.9},
-                "matchup_analysis": "Excellent target share in high-powered offense.",
-                "injury_status": "ACTIVE"
-            }
-        ])
-    
-    return {
-        "recommendations": base_recommendations,
-        "team_info": {
-            "team_id": team_id,
-            "team_name": team_info["team_name"],
-            "league_id": team_info["league_id"]
         }
-    }
+        
+    except Exception as e:
+        logger.error(f"Error fetching ESPN free agents: {e}")
+        # Fall back to empty recommendations on error
+        return {
+            "recommendations": [],
+            "team_info": {
+                "team_id": team_id,
+                "team_name": team_info["team_name"],
+                "league_id": team_info["league_id"]
+            },
+            "error": "Unable to fetch waiver recommendations at this time"
+        }
+    
 
 
 @router.post("/{team_id}/trade-targets")
