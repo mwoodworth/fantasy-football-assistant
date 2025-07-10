@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import random
+import logging
 from pydantic import BaseModel
 
 from ..models.database import get_db
@@ -16,6 +17,7 @@ from ..utils.dependencies import get_current_active_user
 from ..services.espn_bridge import get_espn_bridge_service
 from ..config import settings
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
@@ -320,36 +322,167 @@ async def get_live_scores(
 @router.get("/top-performers", response_model=List[TopPerformer])
 async def get_top_performers(
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
     limit: int = 10
 ):
     """Get top performing players this week"""
-    performers = generate_top_performers()
-    return performers[:limit]
+    # Get user's ESPN leagues
+    espn_leagues = db.query(ESPNLeague).filter(
+        ESPNLeague.user_id == current_user.id,
+        ESPNLeague.is_active == True,
+        ESPNLeague.is_archived == False
+    ).all()
+    
+    if not espn_leagues:
+        # Return empty list if no leagues
+        return []
+    
+    # For pre-season, return empty list (no games played yet)
+    # TODO: Once season starts, fetch actual top performers from ESPN
+    # This would involve:
+    # 1. Getting current week number
+    # 2. Fetching player stats for the week
+    # 3. Sorting by points scored
+    # 4. Returning top N performers
+    
+    # For now, return empty list for pre-season
+    return []
 
 
 @router.get("/trending-players", response_model=List[TrendingPlayer])
 async def get_trending_players(
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
     limit: int = 10
 ):
     """Get trending players (pickup percentage increase)"""
-    trending = generate_trending_players()
-    return trending[:limit]
+    # Get user's ESPN leagues
+    espn_leagues = db.query(ESPNLeague).filter(
+        ESPNLeague.user_id == current_user.id,
+        ESPNLeague.is_active == True,
+        ESPNLeague.is_archived == False
+    ).all()
+    
+    if not espn_leagues:
+        # Return empty list if no leagues
+        return []
+    
+    try:
+        # Get the primary league (first active league)
+        primary_league = espn_leagues[0]
+        
+        # Fetch trending players from ESPN
+        from ..services.espn_integration import espn_service
+        trending_data = await espn_service.get_trending_players(
+            trend_type="add",
+            hours=24,
+            limit=limit,
+            league_id=primary_league.espn_league_id
+        )
+        
+        # Convert ESPN data to our format
+        trending_players = []
+        if trending_data and 'players' in trending_data:
+            for i, player in enumerate(trending_data['players'][:limit]):
+                trending_players.append(TrendingPlayer(
+                    player=Player(
+                        id=player.get('id', i),
+                        name=player.get('fullName', 'Unknown'),
+                        position=player.get('defaultPositionId', 'FLEX'),
+                        team=player.get('proTeamId', 'FA')
+                    ),
+                    trendDirection="up",
+                    trendPercentage=player.get('ownership', {}).get('percentChange', 0.0),
+                    reason=f"Added by {player.get('ownership', {}).get('percentOwned', 0):.1f}% of leagues",
+                    ownershipChange=player.get('ownership', {}).get('percentChange', 0.0),
+                    addDropRatio=player.get('ownership', {}).get('auctionValueAverage', 0.0)
+                ))
+        
+        return trending_players
+        
+    except Exception as e:
+        logger.error(f"Error fetching trending players: {e}")
+        # Return empty list on error
+        return []
 
 
 @router.get("/waiver-targets", response_model=List[WaiverTarget])
 async def get_waiver_targets(
     current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
     position: Optional[str] = None,
     limit: int = 10
 ):
     """Get recommended waiver wire targets"""
-    targets = generate_waiver_targets()
+    # Get user's ESPN leagues
+    espn_leagues = db.query(ESPNLeague).filter(
+        ESPNLeague.user_id == current_user.id,
+        ESPNLeague.is_active == True,
+        ESPNLeague.is_archived == False
+    ).all()
     
-    if position:
-        targets = [t for t in targets if t.position.upper() == position.upper()]
+    if not espn_leagues:
+        # Return empty list if no leagues
+        return []
     
-    return targets[:limit]
+    try:
+        # Get the primary league (first active league)
+        primary_league = espn_leagues[0]
+        
+        # Fetch free agents from ESPN
+        from ..services.espn_integration import espn_service
+        free_agents = await espn_service.get_free_agents(
+            league_id=primary_league.espn_league_id,
+            season=primary_league.season,
+            position=position,
+            limit=limit * 2,  # Get more to filter
+            espn_s2=primary_league.espn_s2,
+            swid=primary_league.swid
+        )
+        
+        # Convert ESPN data to our format
+        waiver_targets = []
+        if free_agents and 'players' in free_agents:
+            for i, player in enumerate(free_agents['players'][:limit]):
+                player_info = player.get('player', {})
+                
+                # Calculate matchup difficulty based on opponent defense ranking
+                # For now, use a simple calculation
+                ownership_pct = player_info.get('ownership', {}).get('percentOwned', 0)
+                if ownership_pct < 20:
+                    difficulty = "easy"
+                    priority = "low"
+                elif ownership_pct < 40:
+                    difficulty = "medium"
+                    priority = "medium"
+                else:
+                    difficulty = "hard"
+                    priority = "high"
+                
+                waiver_targets.append(WaiverTarget(
+                    player=Player(
+                        id=player_info.get('id', i),
+                        name=player_info.get('fullName', 'Unknown'),
+                        position=player_info.get('defaultPositionId', 'FLEX'),
+                        team=player_info.get('proTeamId', 'FA')
+                    ),
+                    ownershipPercentage=ownership_pct,
+                    projectedPoints=player_info.get('stats', [{}])[0].get('appliedTotal', 0.0) if player_info.get('stats') else 0.0,
+                    upcomingMatchup=f"vs {player_info.get('proTeamId', 'TBD')}",
+                    matchupDifficulty=difficulty,
+                    recommendation=f"{'High' if priority == 'high' else 'Medium' if priority == 'medium' else 'Low'} priority add",
+                    priority=priority
+                ))
+        
+        # Sort by projected points descending
+        waiver_targets.sort(key=lambda x: x.projectedPoints, reverse=True)
+        
+        return waiver_targets[:limit]
+        
+    except Exception as e:
+        logger.error(f"Error fetching waiver targets: {e}")
+        # Return empty list on error
+        return []
 
 
 @router.get("/injury-report")
