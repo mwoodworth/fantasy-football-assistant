@@ -258,7 +258,9 @@ async def connect_espn_league(
         try:
             league_info = await espn_service.get_league_info(
                 league_data.espn_league_id,
-                league_data.season
+                league_data.season,
+                league_data.espn_s2,
+                league_data.swid
             )
         except ESPNAuthError as e:
             logger.error(f"ESPN authentication error: {e}")

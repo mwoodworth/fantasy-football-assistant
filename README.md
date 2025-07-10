@@ -328,6 +328,7 @@ fantasy-football-assistant/
 - [ ] Multi-league management
 
 ### Phase 8: Data & Integration
+- [ ] **ESPN Free Agency Recommendations API**: Integrate ESPN's AI-powered free agency recommendations with authentication
 - [ ] Additional data sources (Yahoo, Sleeper, etc.)
 - [ ] Advanced weather impact analysis
 - [ ] Vegas odds integration

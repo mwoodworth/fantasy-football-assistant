@@ -13,6 +13,10 @@ from ..utils.dependencies import get_current_active_user
 from ..utils.schemas import PlayerResponse, PlayerStatsResponse
 from ..services.player import PlayerService
 from ..services.espn_integration import ESPNDataService
+from ..services.player_sync import player_sync_service
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/players", tags=["players"])
 
@@ -201,17 +205,25 @@ async def search_espn_players(
     
     try:
         espn_service = ESPNDataService()
-        players = await espn_service.search_players(query, limit=limit)
         
-        # If league_id provided, enrich with league-specific data
-        if league_id:
-            # Add ownership percentage, waiver status, etc.
-            pass
+        # If no league_id provided, try to get from user's first ESPN league
+        if not league_id:
+            from ..models.espn_league import ESPNLeague
+            user_league = db.query(ESPNLeague).filter(
+                ESPNLeague.user_id == current_user.id,
+                ESPNLeague.is_active == True
+            ).first()
+            
+            if user_league:
+                league_id = user_league.espn_league_id
+        
+        players = await espn_service.search_players(query, limit=limit, league_id=league_id)
         
         return {
             "query": query,
             "results": players,
-            "count": len(players)
+            "count": len(players),
+            "league_id": league_id
         }
     except Exception as e:
         raise HTTPException(
@@ -343,17 +355,35 @@ async def get_trending_players(
     try:
         espn_service = ESPNDataService()
         
+        # Get user's first ESPN league
+        from ..models.espn_league import ESPNLeague
+        user_league = db.query(ESPNLeague).filter(
+            ESPNLeague.user_id == current_user.id,
+            ESPNLeague.is_active == True
+        ).first()
+        
+        if not user_league:
+            return {
+                "trend_type": trend_type,
+                "hours": hours,
+                "players": [],
+                "count": 0,
+                "message": "No active ESPN league found"
+            }
+        
         trending = await espn_service.get_trending_players(
             trend_type=trend_type,
             hours=hours,
-            limit=limit
+            limit=limit,
+            league_id=user_league.espn_league_id
         )
         
         return {
             "trend_type": trend_type,
             "hours": hours,
-            "players": trending,
-            "count": len(trending)
+            "players": trending.get('players', []) if isinstance(trending, dict) else trending,
+            "count": len(trending.get('players', []) if isinstance(trending, dict) else trending),
+            "league_id": user_league.espn_id
         }
     except Exception as e:
         raise HTTPException(
@@ -372,7 +402,7 @@ async def sync_league_players(
     """Sync all players from an ESPN league"""
     
     # Check if user has access to this league
-    from ..models.fantasy import ESPNLeague
+    from ..models.espn_league import ESPNLeague
     league = db.query(ESPNLeague).filter(
         ESPNLeague.id == league_id,
         ESPNLeague.user_id == current_user.id
@@ -389,7 +419,7 @@ async def sync_league_players(
         
         # Get all players in the league
         sync_result = await espn_service.sync_league_players(
-            league_id=league.espn_id,
+            league_id=league.espn_league_id,
             season=league.season,
             force=force
         )
@@ -439,3 +469,64 @@ async def sync_single_player(
             status_code=500,
             detail=f"Failed to sync player: {str(e)}"
         )
+
+
+@router.post("/sync/enhanced")
+async def sync_players_enhanced(
+    force: bool = Query(False, description="Force refresh cached data"),
+    include_historical: bool = Query(True, description="Include historical stats collection"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Enhanced sync of all players from ESPN with comprehensive data collection"""
+    try:
+        result = await player_sync_service.sync_all_players(
+            db, force=force, include_historical=include_historical
+        )
+        return {
+            "message": "Enhanced player sync completed",
+            "result": result
+        }
+    except Exception as e:
+        logger.error(f"Error during enhanced player sync: {e}")
+        raise HTTPException(status_code=500, detail=f"Enhanced sync failed: {str(e)}")
+
+
+@router.post("/sync/historical")
+async def sync_historical_stats(
+    limit_players: Optional[int] = Query(None, description="Limit number of players to process (for testing)"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """One-time comprehensive sync of historical stats for existing players"""
+    try:
+        result = await player_sync_service.sync_historical_stats_only(
+            db, limit_players=limit_players
+        )
+        return {
+            "message": "Historical stats sync completed", 
+            "result": result
+        }
+    except Exception as e:
+        logger.error(f"Error during historical stats sync: {e}")
+        raise HTTPException(status_code=500, detail=f"Historical sync failed: {str(e)}")
+
+
+@router.post("/sync/basic")
+async def sync_players_basic(
+    force: bool = Query(False, description="Force refresh cached data"),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Basic player sync (player info only, no historical stats)"""
+    try:
+        result = await player_sync_service.sync_all_players(
+            db, force=force, include_historical=False
+        )
+        return {
+            "message": "Basic player sync completed",
+            "result": result
+        }
+    except Exception as e:
+        logger.error(f"Error during basic player sync: {e}")
+        raise HTTPException(status_code=500, detail=f"Basic sync failed: {str(e)}")

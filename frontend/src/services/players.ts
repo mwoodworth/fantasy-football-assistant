@@ -237,4 +237,82 @@ export class PlayerService {
     const response = await api.get(`/players/${playerId}/matchup?${params.toString()}`);
     return response.data;
   }
+
+  // Enhanced ESPN endpoints with cached data
+  static async getAllESPNPlayers(limit: number = 100, offset: number = 0): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString()
+      });
+      const response = await api.get(`/espn/players/all?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get all ESPN players:', error);
+      throw error;
+    }
+  }
+
+  static async searchESPNPlayersEnhanced(filters: {
+    position?: string;
+    teamId?: number;
+    minOwnership?: number;
+    maxOwnership?: number;
+    availableOnly?: boolean;
+    searchName?: string;
+  }): Promise<any> {
+    try {
+      const response = await api.post('/espn/players/search', {
+        position: filters.position,
+        team_id: filters.teamId,
+        min_ownership: filters.minOwnership,
+        max_ownership: filters.maxOwnership,
+        available_only: filters.availableOnly,
+        search_name: filters.searchName
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to search ESPN players:', error);
+      throw error;
+    }
+  }
+
+  static async getESPNTrendingEnhanced(trendType: 'most_owned' | 'least_owned' | 'rising' | 'falling', position?: string, limit: number = 20): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        trend_type: trendType,
+        limit: limit.toString()
+      });
+      if (position) params.append('position', position);
+      
+      const response = await api.get(`/espn/players/trending?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get trending players:', error);
+      throw error;
+    }
+  }
+
+  static async getPlayersByTeam(teamId: number, position?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (position) params.append('position', position);
+      
+      const response = await api.get(`/espn/players/by-team/${teamId}?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get players by team:', error);
+      throw error;
+    }
+  }
+
+  static async getPlayerDistributionStats(): Promise<any> {
+    try {
+      const response = await api.get('/espn/players/stats/distribution');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get player distribution stats:', error);
+      throw error;
+    }
+  }
 }

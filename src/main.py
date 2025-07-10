@@ -22,7 +22,7 @@ import socketio
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router, teams_router
+from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, espn_players_enhanced_router, ai_router, dashboard_router, teams_router
 from .services.websocket_server import create_socket_app, sio
 from .middleware.rate_limiter import RateLimitMiddleware
 from .middleware.error_handler import setup_exception_handlers
@@ -216,6 +216,7 @@ app.include_router(players_router, prefix="/api")
 app.include_router(fantasy_router, prefix="/api")
 app.include_router(espn_router, prefix="/api")
 app.include_router(espn_enhanced_router, prefix="/api")
+app.include_router(espn_players_enhanced_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")

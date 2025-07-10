@@ -51,7 +51,7 @@ export function PlayersPage() {
   
   // Fetch trending players from ESPN
   const { data: trendingData } = useQuery({
-    queryKey: ['trending-players', showTrending],
+    queryKey: ['trending-players', showTrending, selectedLeague?.id],
     queryFn: async () => {
       if (!showTrending) return null;
       const [adding, dropping] = await Promise.all([
@@ -60,7 +60,7 @@ export function PlayersPage() {
       ]);
       return { adding, dropping };
     },
-    enabled: showTrending,
+    enabled: showTrending && !!selectedLeague,
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
   

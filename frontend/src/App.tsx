@@ -8,7 +8,7 @@ import { queryErrorHandler, setupGlobalErrorHandlers, shouldRetryRequest } from 
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { PlayersPage } from './pages/PlayersPage';
+import { PlayersPageEnhanced } from './pages/PlayersPageEnhanced';
 import { PlayerDetailPage } from './pages/PlayerDetailPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { ESPNLeaguesPage } from './pages/ESPNLeaguesPage';
@@ -64,7 +64,7 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="players" element={<PlayersPage />} />
+            <Route path="players" element={<PlayersPageEnhanced />} />
             <Route path="players/:playerId" element={<PlayerDetailPage />} />
             <Route path="teams" element={<TeamsPage />} />
             <Route path="espn/leagues" element={<ESPNLeaguesPage />} />

@@ -123,12 +123,14 @@ class ESPNServiceClient:
         return await self._make_request('GET', '/health/espn')
     
     # League Methods
-    async def get_league_info(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
+    async def get_league_info(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get league information"""
         return await self._make_request(
             'GET', 
             f'/api/leagues/{league_id}',
-            params={'season': season}
+            params={'season': season},
+            espn_s2=espn_s2,
+            swid=swid
         )
     
     async def get_league_settings(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
@@ -221,7 +223,7 @@ class ESPNServiceClient:
     
     # Player Methods
     async def get_free_agents(self, league_id: int, season: int = 2024, position: Optional[str] = None, 
-                            limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+                            limit: int = 50, offset: int = 0, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get available free agents"""
         params = {
             'leagueId': league_id,
@@ -236,33 +238,58 @@ class ESPNServiceClient:
         return await self._make_request(
             'GET',
             '/api/players/free-agents',
-            params=params
+            params=params,
+            espn_s2=espn_s2,
+            swid=swid
         )
     
-    async def get_trending_players(self, trend_type: str = "add", hours: int = 24, limit: int = 20) -> Dict[str, Any]:
+    async def get_trending_players(self, trend_type: str = "add", hours: int = 24, limit: int = 20, league_id: Optional[int] = None) -> Dict[str, Any]:
         """Get trending players (most added/dropped)"""
         try:
-            async with self.client as client:
-                # Use the ESPN API client's trending functionality
-                # This is a placeholder - actual implementation depends on ESPN API
-                return await client.get_trending_players(
-                    trend_type=trend_type,
-                    hours=hours,
-                    limit=limit
-                )
+            # If no league_id provided, we need to get one from the user's leagues
+            if not league_id:
+                # This would need to be passed from the calling code
+                # For now, return empty if no league specified
+                return {"players": [], "message": "No league ID provided"}
+            
+            params = {
+                'leagueId': league_id,
+                'season': 2024,
+                'limit': limit,
+                'type': trend_type  # 'add' or 'drop'
+            }
+            
+            return await self._make_request(
+                'GET',
+                '/api/players/trending',
+                params=params
+            )
         except Exception as e:
             raise ESPNServiceError(f"Failed to get trending players: {str(e)}")
     
-    async def search_players(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
+    async def search_players(self, query: str, limit: int = 20, league_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """Search players by name"""
         try:
-            async with self.client as client:
-                # Search for players across ESPN's database
-                # This is a placeholder - actual implementation depends on ESPN API
-                return await client.search_players(
-                    query=query,
-                    limit=limit
-                )
+            # If no league_id provided, we need to get one from the user's leagues
+            if not league_id:
+                # This would need to be passed from the calling code
+                # For now, return empty if no league specified
+                return []
+            
+            params = {
+                'name': query,
+                'leagueId': league_id,
+                'limit': limit
+            }
+            
+            response = await self._make_request(
+                'GET',
+                '/api/players/search',
+                params=params
+            )
+            
+            # Extract players from response
+            return response.get('players', []) if isinstance(response, dict) else response
         except Exception as e:
             raise ESPNServiceError(f"Failed to search players: {str(e)}")
     
@@ -420,11 +447,11 @@ class ESPNDataService:
         self._cache.clear()
         logger.info("ESPN data cache cleared")
     
-    async def get_league_info(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
+    async def get_league_info(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Get league information from ESPN"""
         try:
             async with self.client as client:
-                return await client.get_league_info(league_id, season)
+                return await client.get_league_info(league_id, season, espn_s2, swid)
         except ESPNServiceError as e:
             # Re-raise with more context
             raise ESPNServiceError(f"Failed to get league {league_id} info for season {season}: {str(e)}")
@@ -443,6 +470,17 @@ class ESPNDataService:
         except Exception as e:
             logger.error(f"Unexpected error getting draft results: {e}")
             raise ESPNServiceError(f"Unexpected error accessing ESPN draft data: {str(e)}")
+    
+    async def search_players(self, query: str, limit: int = 20, league_id: Optional[int] = None, espn_s2: str = None, swid: str = None) -> List[Dict[str, Any]]:
+        """Search players by name"""
+        try:
+            async with self.client as client:
+                return await client.search_players(query, limit, league_id)
+        except ESPNServiceError as e:
+            raise ESPNServiceError(f"Failed to search players: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error searching players: {e}")
+            raise ESPNServiceError(f"Unexpected error searching players: {str(e)}")
     
     async def sync_league_teams(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Sync all teams in a league with their rosters"""
@@ -535,22 +573,24 @@ class ESPNDataService:
     async def sync_league_players(self, league_id: int, season: int = 2024, force: bool = False) -> Dict[str, Any]:
         """Sync all players from an ESPN league to local database"""
         try:
-            async with self.client as client:
-                # Get all players in the league
-                league_data = await client.get_league_info(league_id, season)
+            # Import here to avoid circular dependency
+            from ..models.database import SessionLocal
+            from .player_sync import player_sync_service
+            
+            db = SessionLocal()
+            try:
+                # Use the player sync service to sync all players
+                # In the future, this could be optimized to only sync league-specific players
+                result = await player_sync_service.sync_all_players(db, force=force)
                 
-                # Process and sync players
-                sync_result = {
-                    "synced_count": 0,
-                    "updated_count": 0,
-                    "errors": []
+                return {
+                    "synced_count": result.get("synced_count", 0),
+                    "updated_count": result.get("updated_count", 0),
+                    "errors": result.get("errors", [])
                 }
+            finally:
+                db.close()
                 
-                # Placeholder for actual sync logic
-                # This would iterate through teams and players
-                # and sync them to the local database
-                
-                return sync_result
         except Exception as e:
             raise ESPNServiceError(f"Failed to sync league players: {str(e)}")
 
