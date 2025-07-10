@@ -33,7 +33,7 @@ async def register(
     if len(user_data.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 8 characters long"
+            detail="Password must be at least 8 characters long. For better security, use a mix of uppercase, lowercase, numbers, and special characters."
         )
     
     if len(user_data.username) < 3:
@@ -43,11 +43,11 @@ async def register(
         )
     
     # Check for common weak passwords
-    weak_passwords = ['password', '12345678', 'password123', 'admin123']
+    weak_passwords = ['password', '12345678', 'password123', 'admin123', 'qwerty123', 'welcome123']
     if user_data.password.lower() in weak_passwords:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password is too weak. Please choose a stronger password"
+            detail="This password is too common and easily guessable. Please choose a stronger password with a mix of letters, numbers, and special characters."
         )
     
     try:
@@ -79,7 +79,7 @@ async def register(
         logging.error(f"Registration error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}"
+            detail="An unexpected error occurred during registration. Please try again or contact support if the problem persists."
         )
 
 

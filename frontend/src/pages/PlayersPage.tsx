@@ -1,14 +1,18 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Filter } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Filter, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { PlayerService } from '../services/players';
 import type { Player } from '../types/player';
 import { PlayerCard } from '../components/players/PlayerCard';
 import { PlayerFilters } from '../components/players/PlayerFilters';
 import { PlayerSearchInput } from '../components/players/PlayerSearchInput';
 import { PlayerDetailsModal } from '../components/players/PlayerDetailsModal';
+import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { Badge } from '../components/common/Badge';
 import { cn } from '../utils/cn';
+import { toast } from '../utils/toast';
+import { useESPNStore } from '../store/useESPNStore';
 
 interface PlayerFiltersType {
   position?: string;
@@ -24,6 +28,10 @@ export function PlayersPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [selectedPlayerIndex, setSelectedPlayerIndex] = useState<number>(-1);
+  const [showTrending, setShowTrending] = useState(false);
+  
+  const queryClient = useQueryClient();
+  const { selectedLeague } = useESPNStore();
 
   const { data: players, isLoading, error } = useQuery({
     queryKey: ['players', searchQuery, filters],
@@ -33,6 +41,33 @@ export function PlayersPage() {
       limit: 50
     }),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  // Fetch trending players from ESPN
+  const { data: trendingData } = useQuery({
+    queryKey: ['trending-players', showTrending],
+    queryFn: async () => {
+      if (!showTrending) return null;
+      const [adding, dropping] = await Promise.all([
+        PlayerService.getESPNTrendingPlayers('add', 24),
+        PlayerService.getESPNTrendingPlayers('drop', 24)
+      ]);
+      return { adding, dropping };
+    },
+    enabled: showTrending,
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+  
+  // Sync league players mutation
+  const syncMutation = useMutation({
+    mutationFn: (leagueId: number) => PlayerService.syncLeaguePlayers(leagueId, false),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['players'] });
+      toast.success('Players synced successfully');
+    },
+    onError: () => {
+      toast.error('Failed to sync players');
+    }
   });
 
   const handleSearch = (query: string) => {
@@ -95,6 +130,28 @@ export function PlayersPage() {
         </div>
         
         <div className="flex items-center gap-2">
+          {selectedLeague && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncMutation.mutate(selectedLeague.id)}
+              disabled={syncMutation.isPending}
+            >
+              <RefreshCw className={cn("w-4 h-4 mr-2", syncMutation.isPending && "animate-spin")} />
+              Sync ESPN
+            </Button>
+          )}
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowTrending(!showTrending)}
+            className={cn(showTrending && 'bg-primary-50 text-primary-700')}
+          >
+            {showTrending ? <TrendingDown className="w-4 h-4 mr-2" /> : <TrendingUp className="w-4 h-4 mr-2" />}
+            Trending
+          </Button>
+          
           <Button
             variant="outline"
             size="sm"
@@ -146,6 +203,41 @@ export function PlayersPage() {
           onChange={handleFilterChange}
           onClear={clearFilters}
         />
+      )}
+
+      {/* Trending Players Section */}
+      {showTrending && trendingData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-5 h-5 text-green-600" />
+              <h3 className="font-semibold text-gray-900">Most Added (24h)</h3>
+            </div>
+            <div className="space-y-2">
+              {trendingData.adding.players?.slice(0, 5).map((player: any, idx: number) => (
+                <div key={player.id} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{idx + 1}. {player.name}</span>
+                  <Badge variant="success" size="sm">+{player.adds_24h}</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+          
+          <Card className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingDown className="w-5 h-5 text-red-600" />
+              <h3 className="font-semibold text-gray-900">Most Dropped (24h)</h3>
+            </div>
+            <div className="space-y-2">
+              {trendingData.dropping.players?.slice(0, 5).map((player: any, idx: number) => (
+                <div key={player.id} className="flex items-center justify-between text-sm">
+                  <span className="font-medium">{idx + 1}. {player.name}</span>
+                  <Badge variant="error" size="sm">-{player.drops_24h}</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* Results Summary */}

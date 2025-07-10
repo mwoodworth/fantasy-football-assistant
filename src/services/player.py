@@ -219,3 +219,69 @@ class PlayerService:
             Player.injury_status.notin_(['Healthy', None]),
             Player.is_active == True
         ).all()
+    
+    @staticmethod
+    def sync_espn_player(db: Session, espn_player_data: Dict[str, Any]) -> Player:
+        """Sync ESPN player data to local database"""
+        espn_id = espn_player_data.get('id')
+        
+        # Check if player already exists
+        player = db.query(Player).filter(Player.espn_id == espn_id).first()
+        
+        if not player:
+            # Create new player
+            player = Player(
+                espn_id=espn_id,
+                name=espn_player_data.get('fullName'),
+                position=espn_player_data.get('defaultPositionId'),
+                jersey_number=espn_player_data.get('jersey'),
+                height=espn_player_data.get('height'),
+                weight=espn_player_data.get('weight'),
+                age=espn_player_data.get('age'),
+                college=espn_player_data.get('college'),
+                is_active=espn_player_data.get('active', True)
+            )
+            
+            # Set team if available
+            if espn_player_data.get('proTeamId'):
+                team = db.query(Team).filter(Team.espn_id == espn_player_data['proTeamId']).first()
+                if team:
+                    player.team_id = team.id
+                    player.team_name = team.name
+                    player.team_abbreviation = team.abbreviation
+            
+            db.add(player)
+            logger.info(f"Created new player: {player.name}")
+        else:
+            # Update existing player
+            player.name = espn_player_data.get('fullName', player.name)
+            player.position = espn_player_data.get('defaultPositionId', player.position)
+            player.jersey_number = espn_player_data.get('jersey', player.jersey_number)
+            player.height = espn_player_data.get('height', player.height)
+            player.weight = espn_player_data.get('weight', player.weight)
+            player.age = espn_player_data.get('age', player.age)
+            player.college = espn_player_data.get('college', player.college)
+            player.is_active = espn_player_data.get('active', player.is_active)
+            
+            # Update team if changed
+            if espn_player_data.get('proTeamId'):
+                team = db.query(Team).filter(Team.espn_id == espn_player_data['proTeamId']).first()
+                if team and team.id != player.team_id:
+                    player.team_id = team.id
+                    player.team_name = team.name
+                    player.team_abbreviation = team.abbreviation
+            
+            logger.info(f"Updated player: {player.name}")
+        
+        # Update injury status if available
+        if espn_player_data.get('injuryStatus'):
+            player.injury_status = espn_player_data['injuryStatus']
+        
+        # Update bye week if available
+        if espn_player_data.get('byeWeek'):
+            player.bye_week = espn_player_data['byeWeek']
+        
+        db.commit()
+        db.refresh(player)
+        
+        return player

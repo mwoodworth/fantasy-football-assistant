@@ -31,8 +31,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false 
       });
     } catch (error: any) {
+      // Handle new error format from middleware
+      const errorMessage = error.response?.data?.error?.message || 
+                          error.response?.data?.detail || 
+                          'Login failed';
       set({ 
-        error: error.response?.data?.detail || 'Login failed', 
+        error: errorMessage, 
         isLoading: false 
       });
       throw error;
@@ -49,8 +53,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false 
       });
     } catch (error: any) {
+      // Handle new error format from middleware
+      const errorMessage = error.response?.data?.error?.message || 
+                          error.response?.data?.detail || 
+                          'Registration failed';
       set({ 
-        error: error.response?.data?.detail || 'Registration failed', 
+        error: errorMessage, 
         isLoading: false 
       });
       throw error;

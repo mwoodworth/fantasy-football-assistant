@@ -13,6 +13,7 @@ class Team(Base):
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, index=True)
+    espn_id = Column(Integer, unique=True, index=True)  # ESPN team ID
     name = Column(String(100), nullable=False)  # "Dallas Cowboys"
     abbreviation = Column(String(10), unique=True, nullable=False)  # "DAL"
     city = Column(String(100))  # "Dallas"
@@ -64,6 +65,25 @@ class Player(Base):
     # Fantasy relevance
     fantasy_positions = Column(String(50))  # "QB", "RB,WR", etc.
     bye_week = Column(Integer)
+    
+    # ESPN-specific fields
+    ownership_percentage = Column(Float, default=0.0)  # % owned in ESPN leagues
+    start_percentage = Column(Float, default=0.0)  # % started in ESPN leagues
+    pro_team_id = Column(Integer)  # ESPN pro team ID
+    default_position_id = Column(Integer)  # ESPN position ID
+    draft_rank = Column(Integer)  # ESPN draft rank
+    draft_average_pick = Column(Float)  # Average draft position
+    
+    # Advanced stats and projections
+    projected_total_points = Column(Float)  # Season projection
+    rest_of_season_projection = Column(Float)  # ROS projection
+    consistency_rating = Column(Float)  # 0-100 consistency score
+    boom_percentage = Column(Float)  # % games above threshold
+    bust_percentage = Column(Float)  # % games below threshold
+    
+    # Additional team info (denormalized for performance)
+    team_name = Column(String(100))
+    team_abbreviation = Column(String(10))
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

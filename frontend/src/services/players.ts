@@ -148,6 +148,79 @@ export class PlayerService {
     const response = await api.get(`/players/trending?direction=${direction}`);
     return response.data;
   }
+  
+  // ESPN-specific methods
+  static async searchESPNPlayers(query: string, leagueId?: number): Promise<Player[]> {
+    try {
+      const params = new URLSearchParams({ query });
+      if (leagueId) params.append('league_id', leagueId.toString());
+      
+      const response = await api.get(`/players/espn/search?${params.toString()}`);
+      return response.data.results;
+    } catch (error) {
+      console.error('Failed to search ESPN players:', error);
+      throw error;
+    }
+  }
+  
+  static async getESPNPlayerDetails(espnPlayerId: number, leagueId?: number): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (leagueId) params.append('league_id', leagueId.toString());
+      
+      const response = await api.get(`/players/espn/${espnPlayerId}${params.toString() ? '?' + params.toString() : ''}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get ESPN player details:', error);
+      throw error;
+    }
+  }
+  
+  static async syncESPNPlayer(espnPlayerId: number): Promise<any> {
+    try {
+      const response = await api.post(`/players/espn/sync/${espnPlayerId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to sync ESPN player:', error);
+      throw error;
+    }
+  }
+  
+  static async getESPNRankings(position: string, scoringType: string = 'standard'): Promise<any> {
+    try {
+      const params = new URLSearchParams({ scoring_type: scoringType });
+      const response = await api.get(`/players/espn/rankings/${position}?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get ESPN rankings:', error);
+      throw error;
+    }
+  }
+  
+  static async getESPNTrendingPlayers(trendType: 'add' | 'drop' = 'add', hours: number = 24): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        trend_type: trendType,
+        hours: hours.toString()
+      });
+      const response = await api.get(`/players/espn/trending?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to get trending players:', error);
+      throw error;
+    }
+  }
+  
+  static async syncLeaguePlayers(leagueId: number, force: boolean = false): Promise<any> {
+    try {
+      const params = new URLSearchParams({ force: force.toString() });
+      const response = await api.post(`/players/espn/sync-league-players/${leagueId}?${params.toString()}`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to sync league players:', error);
+      throw error;
+    }
+  }
 
   static async getWaiverTargets(position?: string): Promise<Player[]> {
     const params = new URLSearchParams();

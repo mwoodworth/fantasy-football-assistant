@@ -28,14 +28,14 @@ class UserService:
         if db.query(User).filter(User.email == email).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                detail="This email address is already registered. Please use a different email or try logging in."
             )
         
         # Check if username already exists
         if db.query(User).filter(User.username == username).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Username already taken"
+                detail="This username is already taken. Please choose a different username."
             )
         
         # Create new user

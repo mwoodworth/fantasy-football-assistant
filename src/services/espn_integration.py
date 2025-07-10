@@ -239,32 +239,32 @@ class ESPNServiceClient:
             params=params
         )
     
-    async def get_trending_players(self, league_id: int, season: int = 2024, limit: int = 20) -> Dict[str, Any]:
-        """Get trending players"""
-        return await self._make_request(
-            'GET',
-            '/api/players/trending',
-            params={
-                'leagueId': league_id,
-                'season': season,
-                'limit': limit
-            }
-        )
+    async def get_trending_players(self, trend_type: str = "add", hours: int = 24, limit: int = 20) -> Dict[str, Any]:
+        """Get trending players (most added/dropped)"""
+        try:
+            async with self.client as client:
+                # Use the ESPN API client's trending functionality
+                # This is a placeholder - actual implementation depends on ESPN API
+                return await client.get_trending_players(
+                    trend_type=trend_type,
+                    hours=hours,
+                    limit=limit
+                )
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get trending players: {str(e)}")
     
-    async def search_players(self, league_id: int, name: str, season: int = 2024, 
-                           include_rostered: bool = False, limit: int = 20) -> Dict[str, Any]:
+    async def search_players(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
         """Search players by name"""
-        return await self._make_request(
-            'GET',
-            '/api/players/search',
-            params={
-                'leagueId': league_id,
-                'name': name,
-                'season': season,
-                'includeRostered': include_rostered,
-                'limit': limit
-            }
-        )
+        try:
+            async with self.client as client:
+                # Search for players across ESPN's database
+                # This is a placeholder - actual implementation depends on ESPN API
+                return await client.search_players(
+                    query=query,
+                    limit=limit
+                )
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to search players: {str(e)}")
     
     async def get_players_by_position(self, position: str, league_id: int, season: int = 2024,
                                     available_only: bool = True, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
@@ -509,6 +509,50 @@ class ESPNDataService:
                 'error': str(e),
                 'roster': []
             }
+    
+    async def get_player_details(self, espn_player_id: int) -> Dict[str, Any]:
+        """Get detailed information for a specific ESPN player"""
+        try:
+            async with self.client as client:
+                # Get player details from ESPN
+                return await client.get_player_details(espn_player_id)
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get player details for ID {espn_player_id}: {str(e)}")
+    
+    async def get_position_rankings(self, position: str, scoring_type: str = "standard", limit: int = 50) -> List[Dict[str, Any]]:
+        """Get ESPN expert rankings by position"""
+        try:
+            async with self.client as client:
+                # Get position rankings from ESPN
+                return await client.get_position_rankings(
+                    position=position,
+                    scoring_type=scoring_type,
+                    limit=limit
+                )
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get {position} rankings: {str(e)}")
+    
+    async def sync_league_players(self, league_id: int, season: int = 2024, force: bool = False) -> Dict[str, Any]:
+        """Sync all players from an ESPN league to local database"""
+        try:
+            async with self.client as client:
+                # Get all players in the league
+                league_data = await client.get_league_info(league_id, season)
+                
+                # Process and sync players
+                sync_result = {
+                    "synced_count": 0,
+                    "updated_count": 0,
+                    "errors": []
+                }
+                
+                # Placeholder for actual sync logic
+                # This would iterate through teams and players
+                # and sync them to the local database
+                
+                return sync_result
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to sync league players: {str(e)}")
 
 
 # Singleton instance for use throughout the application
