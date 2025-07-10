@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useAuthStore } from './store/useAuthStore';
+import { queryErrorHandler, setupGlobalErrorHandlers, shouldRetryRequest } from './utils/errorHandler';
 
 // Pages
 import { LoginPage } from './pages/LoginPage';
@@ -25,10 +26,17 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5, // 5 minutes
-      retry: 1,
+      retry: shouldRetryRequest,
+      onError: queryErrorHandler,
+    },
+    mutations: {
+      onError: queryErrorHandler,
     },
   },
 });
+
+// Setup global error handlers
+setupGlobalErrorHandlers();
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);

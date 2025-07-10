@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Filter } from 'lucide-react';
-import { PlayerService, type Player } from '../services/players';
+import { PlayerService } from '../services/players';
+import type { Player } from '../types/player';
 import { PlayerCard } from '../components/players/PlayerCard';
 import { PlayerFilters } from '../components/players/PlayerFilters';
 import { PlayerSearchInput } from '../components/players/PlayerSearchInput';
+import { PlayerDetailsModal } from '../components/players/PlayerDetailsModal';
 import { Button } from '../components/common/Button';
 import { cn } from '../utils/cn';
 
@@ -20,6 +22,8 @@ export function PlayersPage() {
   const [filters, setFilters] = useState<PlayerFiltersType>({});
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  const [selectedPlayerIndex, setSelectedPlayerIndex] = useState<number>(-1);
 
   const { data: players, isLoading, error } = useQuery({
     queryKey: ['players', searchQuery, filters],
@@ -42,6 +46,28 @@ export function PlayersPage() {
   const clearFilters = () => {
     setFilters({});
     setSearchQuery('');
+  };
+
+  const handlePlayerClick = (player: Player) => {
+    setSelectedPlayer(player);
+    const index = players?.findIndex(p => p.id === player.id) ?? -1;
+    setSelectedPlayerIndex(index);
+  };
+
+  const handleNextPlayer = () => {
+    if (players && selectedPlayerIndex < players.length - 1) {
+      const nextIndex = selectedPlayerIndex + 1;
+      setSelectedPlayer(players[nextIndex]);
+      setSelectedPlayerIndex(nextIndex);
+    }
+  };
+
+  const handlePreviousPlayer = () => {
+    if (players && selectedPlayerIndex > 0) {
+      const prevIndex = selectedPlayerIndex - 1;
+      setSelectedPlayer(players[prevIndex]);
+      setSelectedPlayerIndex(prevIndex);
+    }
   };
 
   if (error) {
@@ -166,6 +192,7 @@ export function PlayersPage() {
               key={player.id}
               player={player}
               viewMode={viewMode}
+              onPlayerClick={handlePlayerClick}
             />
           ))}
         </div>
@@ -181,6 +208,20 @@ export function PlayersPage() {
           </Button>
         </div>
       )}
+
+      {/* Player Details Modal */}
+      <PlayerDetailsModal
+        player={selectedPlayer}
+        isOpen={!!selectedPlayer}
+        onClose={() => {
+          setSelectedPlayer(null);
+          setSelectedPlayerIndex(-1);
+        }}
+        onNext={handleNextPlayer}
+        onPrevious={handlePreviousPlayer}
+        hasNext={players ? selectedPlayerIndex < players.length - 1 : false}
+        hasPrevious={selectedPlayerIndex > 0}
+      />
     </div>
   );
 }

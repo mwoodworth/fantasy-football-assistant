@@ -260,27 +260,24 @@ async def connect_espn_league(
                 league_data.espn_league_id,
                 league_data.season
             )
+        except ESPNAuthError as e:
+            logger.error(f"ESPN authentication error: {e}")
+            raise HTTPException(
+                status_code=401,
+                detail=f"ESPN authentication failed. Please check your ESPN credentials (S2 and SWID cookies) and try again."
+            )
+        except ESPNServiceError as e:
+            logger.error(f"ESPN service error: {e}")
+            raise HTTPException(
+                status_code=503,
+                detail=f"ESPN service is currently unavailable. Please try again later."
+            )
         except Exception as e:
-            logger.warning(f"ESPN service unavailable, using mock data: {e}")
-            # Use mock data when ESPN service is unavailable
-            league_info = {
-                'name': league_data.league_name or f'League {league_data.espn_league_id}',
-                'size': 10,
-                'roster_positions': {
-                    'QB': 1, 'RB': 2, 'WR': 2, 'TE': 1, 'FLEX': 1, 'K': 1, 'DEF': 1, 'BENCH': 6
-                },
-                'scoring_settings': {
-                    '53': {'points': 1.0},  # PPR
-                    '4': {'points': 4.0},   # Passing TD
-                    '5': {'points': 6.0},   # Rushing TD
-                    '6': {'points': 6.0},   # Receiving TD
-                },
-                'scoring_type': 'ppr',
-                'draft_date': None,
-                'user_team_id': 1,
-                'user_team_name': 'My Team',
-                'user_team_abbreviation': 'MT'
-            }
+            logger.error(f"Failed to get league info from ESPN: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to connect to ESPN league. Error: {str(e)}"
+            )
         
         # Generate league group ID for multi-year tracking
         league_group_id = f"espn_{league_data.espn_league_id}"
@@ -296,11 +293,15 @@ async def connect_espn_league(
         
         # Try to get draft position from ESPN
         user_draft_position = None
+        draft_results = None  # Initialize draft_results
+        draft_error = None
         try:
             draft_results = await espn_service.get_draft_results(
                 league_data.espn_league_id,
                 league_data.season
             )
+            logger.info(f"Draft results fetched for league {league_data.espn_league_id}: {draft_results}")
+            
             # Extract user's draft position from draft results if available
             if draft_results and 'success' in draft_results and draft_results['success']:
                 draft_data = draft_results.get('data', {})
@@ -310,20 +311,36 @@ async def connect_espn_league(
                     for team in teams:
                         if team.get('id') == user_team_id:
                             user_draft_position = team.get('draftPosition')
+                            logger.info(f"Found user draft position: {user_draft_position}")
                             break
-        except Exception as e:
+            else:
+                logger.warning(f"Draft results response was not successful: {draft_results}")
+        except ESPNServiceError as e:
+            draft_error = f"ESPN draft data unavailable: {e}"
             logger.warning(f"Could not fetch draft position for league {league_data.espn_league_id}: {e}")
+        except Exception as e:
+            draft_error = f"Error fetching draft data: {e}"
+            logger.error(f"Unexpected error fetching draft position for league {league_data.espn_league_id}: {e}")
 
         # Check if draft has been completed based on draft results
         draft_completed = False
-        if draft_results and 'success' in draft_results and draft_results['success']:
-            draft_data = draft_results.get('data', {})
-            picks = draft_data.get('picks', [])
-            total_rounds = draft_data.get('totalRounds', 16)
-            expected_picks = league_info.get('size', 10) * total_rounds
-            # If we have all picks, draft is complete
-            if len(picks) >= expected_picks:
-                draft_completed = True
+        if draft_results:
+            # Handle different response formats
+            if isinstance(draft_results, dict):
+                if 'success' in draft_results and draft_results['success']:
+                    draft_data = draft_results.get('data', {})
+                    picks = draft_data.get('picks', [])
+                    total_rounds = draft_data.get('totalRounds', 16)
+                    expected_picks = league_info.get('size', 10) * total_rounds
+                    # If we have all picks, draft is complete
+                    if len(picks) >= expected_picks:
+                        draft_completed = True
+                elif 'picks' in draft_results:
+                    # Direct format without success wrapper
+                    picks = draft_results.get('picks', [])
+                    if picks:
+                        draft_completed = True
+                        logger.info(f"Draft appears to be completed with {len(picks)} picks")
         
         # Create new league record
         new_league = ESPNLeague(
@@ -356,12 +373,24 @@ async def connect_espn_league(
         # Schedule initial data sync
         background_tasks.add_task(sync_league_data, new_league.id)
         
-        return {
+        response = {
             "message": "League connected successfully",
             "league_id": new_league.id,
             "league_name": new_league.league_name,
-            "scoring_type": new_league.get_league_type_description()
+            "scoring_type": new_league.get_league_type_description(),
+            "draft_info": {
+                "draft_completed": draft_completed,
+                "user_draft_position": user_draft_position,
+                "draft_date": new_league.draft_date.isoformat() if new_league.draft_date else None
+            }
         }
+        
+        # Add draft error info if there was an issue
+        if draft_error:
+            response["draft_info"]["error"] = draft_error
+            response["message"] += f" (Note: {draft_error})"
+        
+        return response
         
     except ESPNServiceError as e:
         logger.error(f"ESPN service error connecting league: {e}")

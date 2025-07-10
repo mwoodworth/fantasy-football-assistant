@@ -18,7 +18,7 @@ from .websocket_server import (
     emit_draft_status_change,
     emit_sync_error
 )
-from ..core.config import settings
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -52,13 +52,27 @@ class DraftMonitor:
         
     async def _monitoring_loop(self):
         """Main loop that monitors active drafts"""
+        consecutive_errors = 0
+        max_consecutive_errors = 5
+        
         while self.is_running:
             try:
                 await self._check_active_drafts()
+                consecutive_errors = 0  # Reset on success
                 await asyncio.sleep(self.polling_interval)
             except Exception as e:
-                logger.error(f"Error in monitoring loop: {e}")
-                await asyncio.sleep(self.polling_interval * 2)  # Back off on error
+                consecutive_errors += 1
+                logger.error(f"Error in monitoring loop (attempt {consecutive_errors}): {e}")
+                
+                # Exponential backoff
+                backoff_time = min(self.polling_interval * (2 ** consecutive_errors), 60)
+                await asyncio.sleep(backoff_time)
+                
+                # Stop monitoring if too many consecutive errors
+                if consecutive_errors >= max_consecutive_errors:
+                    logger.critical(f"Draft monitor stopping after {max_consecutive_errors} consecutive errors")
+                    await self.stop()
+                    break
                 
     async def _check_active_drafts(self):
         """Check all active draft sessions and sync their state"""

@@ -12,8 +12,14 @@ const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
   username: z.string().min(3, 'Username must be at least 3 characters'),
-  first_name: z.string().min(2, 'First name must be at least 2 characters').optional(),
-  last_name: z.string().min(2, 'Last name must be at least 2 characters').optional(),
+  first_name: z.union([
+    z.string().length(0),
+    z.string().min(2, 'First name must be at least 2 characters')
+  ]).optional(),
+  last_name: z.union([
+    z.string().length(0),
+    z.string().min(2, 'Last name must be at least 2 characters')
+  ]).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],

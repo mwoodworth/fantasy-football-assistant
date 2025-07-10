@@ -127,7 +127,11 @@ npm install
 
 4. Initialize the database:
 ```bash
-alembic upgrade head
+# Make sure virtual environment is activated
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run database migrations
+python -m alembic upgrade head
 ```
 
 5. Check dependencies (optional but recommended):

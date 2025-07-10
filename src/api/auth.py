@@ -29,6 +29,27 @@ async def register(
 ):
     """Register a new user"""
     
+    # Additional validation
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    
+    if len(user_data.username) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username must be at least 3 characters long"
+        )
+    
+    # Check for common weak passwords
+    weak_passwords = ['password', '12345678', 'password123', 'admin123']
+    if user_data.password.lower() in weak_passwords:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password is too weak. Please choose a stronger password"
+        )
+    
     try:
         # Create new user
         user = UserService.create_user(
@@ -44,11 +65,21 @@ async def register(
         return UserResponse.model_validate(user)
         
     except HTTPException:
+        # Re-raise HTTPExceptions with their specific error messages
         raise
+    except ValueError as e:
+        # Handle validation errors
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
+        # Log the actual error for debugging
+        import logging
+        logging.error(f"Registration error: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Registration failed"
+            detail=f"Registration failed: {str(e)}"
         )
 
 

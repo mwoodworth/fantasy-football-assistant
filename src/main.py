@@ -24,6 +24,9 @@ from .models.database import create_tables, engine
 from .models import Base
 from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, ai_router, dashboard_router, teams_router
 from .services.websocket_server import create_socket_app, sio
+from .middleware.rate_limiter import RateLimitMiddleware
+from .middleware.error_handler import setup_exception_handlers
+from .middleware.request_tracker import RequestTrackingMiddleware, PerformanceMonitoringMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -161,7 +164,26 @@ async def shutdown_event():
     
     stop_espn_service()
 
-# CORS middleware
+# Add middleware in the correct order (order matters!)
+
+# 1. Request tracking (first to track all requests)
+app.add_middleware(RequestTrackingMiddleware, log_request_body=False, slow_request_threshold=2.0)
+
+# 2. Performance monitoring
+app.add_middleware(PerformanceMonitoringMiddleware)
+
+# 3. Rate limiting
+app.add_middleware(
+    RateLimitMiddleware,
+    default_limit=60,      # 60 requests per minute default
+    default_window=60,
+    espn_limit=10,         # 10 ESPN requests per minute
+    espn_window=60,
+    ai_limit=20,           # 20 AI requests per hour
+    ai_window=3600
+)
+
+# 4. CORS (must be after rate limiting)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
@@ -169,6 +191,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Setup exception handlers
+setup_exception_handlers(app)
 
 # Include API routers
 app.include_router(auth_router, prefix="/api")
@@ -222,6 +247,26 @@ async def health_check():
             "espn_service": 3001
         }
     }
+
+# Performance monitoring endpoint
+@app.get("/api/metrics")
+async def get_metrics():
+    """Get performance metrics"""
+    # Get performance stats from middleware
+    perf_middleware = None
+    for middleware in app.middleware:
+        if hasattr(middleware, 'cls') and middleware.cls.__name__ == 'PerformanceMonitoringMiddleware':
+            perf_middleware = middleware
+            break
+    
+    if perf_middleware and hasattr(perf_middleware, 'app'):
+        stats = perf_middleware.app.get_stats()
+        return {
+            "endpoint_stats": stats,
+            "timestamp": time.time()
+        }
+    
+    return {"message": "Performance metrics not available"}
 
 # Root endpoint
 @app.get("/", response_class=HTMLResponse)

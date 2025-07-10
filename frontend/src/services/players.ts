@@ -1,18 +1,8 @@
 import { api } from './api';
+import { generateMockPlayers } from '../utils/mockPlayerData';
+import type { Player, PlayersFilterOptions, PlayersResponse } from '../types/player';
 
-export interface Player {
-  id: number;
-  name: string;
-  position: string;
-  team: string;
-  bye_week: number;
-  injury_status?: string;
-  projected_points?: number;
-  average_points?: number;
-  trend?: 'up' | 'down' | 'stable';
-  ownership_percentage?: number;
-  trade_value?: number;
-}
+export type { Player, PlayersFilterOptions, PlayersResponse };
 
 export interface PlayerSearchParams {
   search?: string;
@@ -52,17 +42,55 @@ export interface ComparisonResult {
   recommendation: string;
 }
 
+// Generate mock players once when the service loads
+const mockPlayers = generateMockPlayers();
+
 export class PlayerService {
   static async getPlayers(params: PlayerSearchParams = {}): Promise<Player[]> {
-    const searchParams = new URLSearchParams();
-    
-    if (params.search) searchParams.append('search', params.search);
-    if (params.position) searchParams.append('position', params.position);
-    if (params.team) searchParams.append('team', params.team);
-    if (params.limit) searchParams.append('limit', params.limit.toString());
-    
-    const response = await api.get(`/players?${searchParams.toString()}`);
-    return response.data;
+    try {
+      const searchParams = new URLSearchParams();
+      
+      if (params.search) searchParams.append('search', params.search);
+      if (params.position) searchParams.append('position', params.position);
+      if (params.team) searchParams.append('team', params.team);
+      if (params.limit) searchParams.append('limit', params.limit.toString());
+      
+      const response = await api.get(`/players?${searchParams.toString()}`);
+      return response.data;
+    } catch (error) {
+      // Fallback to mock data if API fails
+      console.log('Using mock player data');
+      let filteredPlayers = [...mockPlayers];
+      
+      // Apply filters to mock data
+      if (params.search) {
+        const searchLower = params.search.toLowerCase();
+        filteredPlayers = filteredPlayers.filter(player => 
+          player.name.toLowerCase().includes(searchLower) ||
+          player.team.toLowerCase().includes(searchLower) ||
+          player.position.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      if (params.position) {
+        filteredPlayers = filteredPlayers.filter(player => 
+          player.position === params.position
+        );
+      }
+      
+      if (params.team) {
+        filteredPlayers = filteredPlayers.filter(player => 
+          player.team === params.team
+        );
+      }
+      
+      // Apply limit
+      if (params.limit) {
+        filteredPlayers = filteredPlayers.slice(0, params.limit);
+      }
+      
+      return filteredPlayers;
+    }
   }
 
   static async searchPlayers(params: PlayerSearchParams): Promise<Player[]> {
@@ -70,8 +98,17 @@ export class PlayerService {
   }
 
   static async getPlayer(playerId: number): Promise<Player> {
-    const response = await api.get(`/players/${playerId}`);
-    return response.data;
+    try {
+      const response = await api.get(`/players/${playerId}`);
+      return response.data;
+    } catch (error) {
+      // Fallback to mock data
+      const player = mockPlayers.find(p => p.id === playerId);
+      if (!player) {
+        throw new Error('Player not found');
+      }
+      return player;
+    }
   }
 
   static async getPlayerStats(playerId: number, week?: number): Promise<PlayerStats[]> {

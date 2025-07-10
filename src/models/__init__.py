@@ -9,7 +9,8 @@ from .fantasy import League, FantasyTeam, Roster, Trade, WaiverClaim
 from .espn_league import (
     ESPNLeague, 
     DraftSession, 
-    DraftRecommendation, 
+    DraftRecommendation,
+    DraftEvent,
     LeagueHistoricalData, 
     UserLeagueSettings
 )
@@ -31,7 +32,8 @@ __all__ = [
     "WaiverClaim",
     "ESPNLeague",
     "DraftSession",
-    "DraftRecommendation", 
+    "DraftRecommendation",
+    "DraftEvent",
     "LeagueHistoricalData",
     "UserLeagueSettings",
     "ESPNTeam",

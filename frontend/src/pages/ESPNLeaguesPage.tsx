@@ -162,10 +162,15 @@ export function ESPNLeaguesPage() {
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Calendar className="h-4 w-4" />
                   <span>
-                    Draft: {league.draft_date 
-                      ? new Date(league.draft_date).toLocaleDateString()
-                      : 'Not scheduled'
+                    Draft: {league.draft_completed 
+                      ? 'Completed' 
+                      : league.draft_date 
+                        ? new Date(league.draft_date).toLocaleDateString()
+                        : 'Not scheduled'
                     }
+                    {league.draft_completed && league.user_draft_position && (
+                      <span className="text-gray-500"> • Pick #{league.user_draft_position}</span>
+                    )}
                   </span>
                 </div>
 

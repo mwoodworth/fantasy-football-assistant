@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 import logging
 from ..config import settings
+from ..middleware.rate_limiter import espn_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -68,9 +69,12 @@ class ESPNServiceClient:
         return headers
     
     async def _make_request(self, method: str, endpoint: str, espn_s2: str = None, swid: str = None, **kwargs) -> Dict[str, Any]:
-        """Make HTTP request to ESPN service"""
+        """Make HTTP request to ESPN service with rate limiting"""
         if not self._client:
             raise ESPNServiceError("Client not initialized. Use async context manager.")
+        
+        # Wait for rate limit if needed
+        await espn_rate_limiter.wait_if_needed()
         
         # Add ESPN cookies to headers if provided
         headers = kwargs.get('headers', {})
@@ -92,7 +96,9 @@ class ESPNServiceClient:
             elif response.status_code == 404:
                 raise ESPNServiceError("ESPN resource not found")
             elif response.status_code == 429:
-                raise ESPNServiceError("ESPN service rate limit exceeded")
+                # ESPN is rate limiting us, back off
+                logger.warning(f"ESPN rate limit hit for {endpoint}")
+                raise ESPNServiceError("ESPN service rate limit exceeded. Please try again later.")
             elif response.status_code >= 500:
                 raise ESPNServiceError(f"ESPN service error: {response.status_code}")
             
@@ -100,9 +106,13 @@ class ESPNServiceClient:
             return response.json()
             
         except httpx.TimeoutException:
-            raise ESPNServiceError("ESPN service timeout")
+            raise ESPNServiceError("ESPN service timeout - the ESPN integration service may not be running")
+        except httpx.ConnectError as e:
+            logger.error(f"Cannot connect to ESPN service at {self.base_url}: {e}")
+            raise ESPNServiceError(f"ESPN integration service is not available. Please ensure the ESPN service is running at {self.base_url}")
         except httpx.RequestError as e:
-            raise ESPNServiceError(f"ESPN service connection error: {e}")
+            logger.error(f"ESPN service request error: {e}")
+            raise ESPNServiceError(f"ESPN service connection error: {str(e)}")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check ESPN service health"""
@@ -409,6 +419,30 @@ class ESPNDataService:
         """Clear all cached data"""
         self._cache.clear()
         logger.info("ESPN data cache cleared")
+    
+    async def get_league_info(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
+        """Get league information from ESPN"""
+        try:
+            async with self.client as client:
+                return await client.get_league_info(league_id, season)
+        except ESPNServiceError as e:
+            # Re-raise with more context
+            raise ESPNServiceError(f"Failed to get league {league_id} info for season {season}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting league info: {e}")
+            raise ESPNServiceError(f"Unexpected error accessing ESPN league data: {str(e)}")
+    
+    async def get_draft_results(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
+        """Get draft results from ESPN"""
+        try:
+            async with self.client as client:
+                return await client.get_draft_results(league_id, season)
+        except ESPNServiceError as e:
+            # Re-raise with more context
+            raise ESPNServiceError(f"Failed to get draft results for league {league_id} season {season}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error getting draft results: {e}")
+            raise ESPNServiceError(f"Unexpected error accessing ESPN draft data: {str(e)}")
     
     async def sync_league_teams(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
         """Sync all teams in a league with their rosters"""
