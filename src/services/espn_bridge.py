@@ -220,14 +220,16 @@ class ESPNBridgeService:
     # Private helper methods
     
     def _calculate_team_rank(self, league: ESPNLeague) -> str:
-        """Calculate team rank (mock implementation)"""
-        # TODO: Implement actual rank calculation from ESPN data
-        return "--"  # More realistic for 2025 pre-season
+        """Calculate team rank"""
+        # For now, return "--" for pre-season (before week 1)
+        # In the future, this will fetch from ESPN API
+        return "--"
     
     def _get_weekly_points(self, league: ESPNLeague) -> str:
-        """Get weekly points (mock implementation)"""
-        # TODO: Get actual weekly points from ESPN
-        return "127.4"
+        """Get weekly points"""
+        # For now, return "0" for pre-season
+        # In the future, this will fetch current week's points from ESPN API
+        return "0"
     
     def _count_active_players(self, league: ESPNLeague) -> int:
         """Count active players (mock implementation)"""

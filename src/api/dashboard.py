@@ -230,23 +230,12 @@ def generate_waiver_targets() -> List[WaiverTarget]:
 
 
 # API endpoints
-@router.get("/", response_model=DashboardOverview)
+@router.get("/")
 async def get_dashboard_overview(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Get dashboard overview data from ESPN leagues"""
-    
-    # Check if we should use mock data
-    if settings.use_mock_data:
-        return DashboardOverview(
-            total_teams=3,
-            active_leagues=2,
-            weekly_points=145.7,
-            season_rank=3,
-            next_matchup="vs Thunder Bolts (Mock League)",
-            waiver_claims=2
-        )
     
     # Get ESPN bridge service
     espn_bridge = get_espn_bridge_service(db)
@@ -259,30 +248,65 @@ async def get_dashboard_overview(
     
     if espn_leagues:
         # Use actual ESPN data
-        active_leagues = len([l for l in espn_leagues if l.is_active])
-        total_teams = len(espn_leagues)
-        
-        # Get dashboard data from ESPN bridge
         dashboard_data = await espn_bridge.get_user_dashboard_data(current_user.id)
         
-        return DashboardOverview(
-            total_teams=total_teams,
-            active_leagues=active_leagues,
-            weekly_points=float(dashboard_data.weeklyPoints),
-            season_rank=int(dashboard_data.teamRank.replace('rd', '').replace('st', '').replace('nd', '').replace('th', '')) if dashboard_data.teamRank.replace('rd', '').replace('st', '').replace('nd', '').replace('th', '').isdigit() else 1,
-            next_matchup=f"League: {espn_leagues[0].league_name}" if espn_leagues else "No active leagues",
-            waiver_claims=0  # TODO: Calculate from ESPN data
-        )
+        # Convert team rank string to integer, handling various formats
+        team_rank_str = dashboard_data.teamRank
+        if team_rank_str == "--" or not team_rank_str:
+            team_rank_value = None
+        else:
+            # Remove ordinal suffixes and convert to int
+            team_rank_clean = team_rank_str.replace('st', '').replace('nd', '').replace('rd', '').replace('th', '')
+            team_rank_value = int(team_rank_clean) if team_rank_clean.isdigit() else None
+        
+        # Return the data in the format expected by the frontend
+        return {
+            "teamRank": dashboard_data.teamRank,
+            "leagueSize": dashboard_data.leagueSize,
+            "rankTrend": dashboard_data.rankTrend,
+            "weeklyPoints": dashboard_data.weeklyPoints,
+            "pointsProjected": dashboard_data.pointsProjected,
+            "pointsTrend": dashboard_data.pointsTrend,
+            "activePlayers": dashboard_data.activePlayers,
+            "benchPlayers": dashboard_data.benchPlayers,
+            "injuryAlerts": dashboard_data.injuryAlerts,
+            "recentActivity": [
+                {
+                    "type": activity.type,
+                    "title": activity.title,
+                    "description": activity.description,
+                    "timestamp": activity.timestamp,
+                    "priority": activity.priority,
+                    "actionUrl": activity.actionUrl
+                }
+                for activity in dashboard_data.recentActivity
+            ],
+            "injuries": []  # TODO: Implement injury data
+        }
     else:
-        # Fallback to mock data when no ESPN leagues
-        return DashboardOverview(
-            total_teams=0,
-            active_leagues=0,
-            weekly_points=0.0,
-            season_rank=0,
-            next_matchup="Connect ESPN league to see matchups",
-            waiver_claims=0
-        )
+        # Fallback for users without ESPN leagues
+        return {
+            "teamRank": "--",
+            "leagueSize": 0,
+            "rankTrend": "stable",
+            "weeklyPoints": "0",
+            "pointsProjected": 0.0,
+            "pointsTrend": "stable",
+            "activePlayers": "0",
+            "benchPlayers": 0,
+            "injuryAlerts": 0,
+            "recentActivity": [
+                {
+                    "type": "recommendation",
+                    "title": "Connect ESPN League",
+                    "description": "Connect your ESPN fantasy league to get personalized insights",
+                    "timestamp": "Now",
+                    "priority": "high",
+                    "actionUrl": "/espn/leagues"
+                }
+            ],
+            "injuries": []
+        }
 
 
 @router.get("/live-scores", response_model=List[LiveScore])
