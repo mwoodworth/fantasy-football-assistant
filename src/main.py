@@ -238,7 +238,7 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")
 app.include_router(yahoo_router, prefix="/api")
 app.include_router(yahoo_draft_router)
-app.include_router(admin_router)
+app.include_router(admin_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"

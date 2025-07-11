@@ -18,7 +18,7 @@ from ..utils.schemas import UserResponse, UserUpdate
 from ..config import settings
 from ..services.espn_integration import espn_service
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 # User Management Endpoints
@@ -279,7 +279,7 @@ async def get_system_stats(
 
 # Activity Log Endpoints
 
-@router.get("/logs")
+@router.get("/activity")
 async def get_activity_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=1000),
@@ -309,13 +309,26 @@ async def get_activity_logs(
     if end_date:
         query = query.filter(AdminActivityLog.created_at <= end_date)
     
-    total = query.count()
     logs = query.order_by(desc(AdminActivityLog.created_at)).offset(skip).limit(limit).all()
     
-    return {
-        "total": total,
-        "logs": logs
-    }
+    # Format logs with admin username
+    formatted_logs = []
+    for log in logs:
+        formatted_log = {
+            "id": log.id,
+            "admin_id": log.admin_id,
+            "admin_username": log.admin.username if log.admin else "Unknown",
+            "action": log.action,
+            "target_type": log.target_type,
+            "target_id": log.target_id,
+            "details": log.details,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "created_at": log.created_at.isoformat() if log.created_at else None
+        }
+        formatted_logs.append(formatted_log)
+    
+    return formatted_logs
 
 
 # Admin Management Endpoints (Superadmin only)
