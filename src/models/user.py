@@ -37,11 +37,15 @@ class User(Base):
     bio = Column(Text)
     avatar_url = Column(String(500))
     
+    # OAuth tokens
+    yahoo_oauth_token = Column(Text)  # Encrypted Yahoo OAuth token
+    
     # Relationships
     fantasy_teams = relationship("FantasyTeam", back_populates="owner")
     trades = relationship("Trade", back_populates="user")
     waiver_claims = relationship("WaiverClaim", back_populates="user")
     espn_leagues = relationship("ESPNLeague", back_populates="user", cascade="all, delete-orphan")
+    yahoo_leagues = relationship("YahooLeague", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password: str) -> None:
         """Hash and set the user's password"""

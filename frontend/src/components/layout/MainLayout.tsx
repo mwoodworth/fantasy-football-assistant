@@ -20,6 +20,7 @@ const navigation = [
   { name: 'Players', href: '/players', icon: Users },
   { name: 'Teams', href: '/teams', icon: TrendingUp },
   { name: 'ESPN Leagues', href: '/espn/leagues', icon: Trophy },
+  { name: 'Yahoo Leagues', href: '/yahoo/leagues', icon: Trophy },
   { name: 'AI Assistant', href: '/ai-assistant', icon: MessageSquare },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
 ];

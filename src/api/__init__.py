@@ -11,6 +11,7 @@ from .espn_players_enhanced import router as espn_players_enhanced_router
 from .ai import router as ai_router
 from .dashboard import router as dashboard_router
 from .teams import router as teams_router
+from .yahoo import router as yahoo_router
 
 __all__ = [
     "auth_router",
@@ -21,5 +22,6 @@ __all__ = [
     "espn_players_enhanced_router",
     "ai_router",
     "dashboard_router",
-    "teams_router"
+    "teams_router",
+    "yahoo_router"
 ]
