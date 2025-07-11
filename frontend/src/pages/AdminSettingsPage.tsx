@@ -132,10 +132,30 @@ export function AdminSettingsPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
-            <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">General</TabsTrigger>
-            <TabsTrigger value="monitoring" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Monitoring</TabsTrigger>
-            <TabsTrigger value="rate-limits" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Rate Limits</TabsTrigger>
-            <TabsTrigger value="maintenance" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Maintenance</TabsTrigger>
+            <TabsTrigger 
+              value="general" 
+              className="text-gray-700 dark:text-gray-300 font-medium data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900 dark:data-[state=active]:text-white"
+            >
+              General
+            </TabsTrigger>
+            <TabsTrigger 
+              value="monitoring" 
+              className="text-gray-700 dark:text-gray-300 font-medium data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900 dark:data-[state=active]:text-white"
+            >
+              Monitoring
+            </TabsTrigger>
+            <TabsTrigger 
+              value="rate-limits" 
+              className="text-gray-700 dark:text-gray-300 font-medium data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900 dark:data-[state=active]:text-white"
+            >
+              Rate Limits
+            </TabsTrigger>
+            <TabsTrigger 
+              value="maintenance" 
+              className="text-gray-700 dark:text-gray-300 font-medium data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900 dark:data-[state=active]:text-white"
+            >
+              Maintenance
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
