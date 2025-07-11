@@ -298,6 +298,70 @@ async def get_system_stats(
     return stats
 
 
+@router.get("/charts")
+async def get_dashboard_charts(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    """Get chart data for admin dashboard"""
+    from datetime import datetime, timedelta
+    from sqlalchemy import func, extract
+    
+    # User growth data (last 6 months)
+    user_growth = []
+    for i in range(5, -1, -1):
+        month_start = datetime.utcnow() - timedelta(days=30 * i)
+        month_end = month_start + timedelta(days=30)
+        month_name = month_start.strftime('%b')
+        
+        count = db.query(User).filter(
+            User.created_at <= month_end
+        ).count()
+        
+        user_growth.append({
+            "name": month_name,
+            "users": count
+        })
+    
+    # Weekly activity (last 7 days)
+    activity_data = []
+    for i in range(6, -1, -1):
+        day = datetime.utcnow() - timedelta(days=i)
+        day_name = day.strftime('%a')
+        
+        # Count admin activities for that day
+        count = db.query(AdminActivityLog).filter(
+            func.date(AdminActivityLog.created_at) == day.date()
+        ).count()
+        
+        activity_data.append({
+            "name": day_name,
+            "active": count
+        })
+    
+    # Recent activity summary
+    last_24h = datetime.utcnow() - timedelta(hours=24)
+    last_week = datetime.utcnow() - timedelta(days=7)
+    
+    activities_24h = db.query(AdminActivityLog).filter(
+        AdminActivityLog.created_at >= last_24h
+    ).count()
+    
+    activities_week = db.query(AdminActivityLog).filter(
+        AdminActivityLog.created_at >= last_week
+    ).count()
+    
+    return {
+        "user_growth": user_growth,
+        "activity_data": activity_data,
+        "activity_summary": {
+            "last_24h": activities_24h,
+            "last_week": activities_week
+        }
+    }
+
+
 # Activity Log Endpoints
 
 @router.get("/activity")

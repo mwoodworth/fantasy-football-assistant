@@ -62,20 +62,20 @@ function StatCard({ title, value, description, icon: Icon, trend, color = "blue"
   };
 
   const bgClasses = {
-    blue: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
-    green: "from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900",
-    purple: "from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900",
-    orange: "from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900",
+    blue: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
+    green: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
+    purple: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
+    orange: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700",
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-0">
-      <CardContent className={cn("p-6 bg-gradient-to-br", bgClasses[color as keyof typeof bgClasses])}>
+    <Card className={cn("overflow-hidden hover:shadow-lg transition-all duration-300", bgClasses[color as keyof typeof bgClasses])}>
+      <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">{title}</p>
+            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">{title}</p>
             <div className="flex items-baseline space-x-2">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{value}</h2>
               {trend !== undefined && (
                 <span className={cn(
                   "flex items-center text-sm font-semibold",
@@ -108,42 +108,31 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<SystemStats | null>(null);
+  const [chartData, setChartData] = useState<any>(null);
 
   useEffect(() => {
-    fetchSystemStats();
+    fetchDashboardData();
   }, []);
 
-  const fetchSystemStats = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/stats');
-      setStats(response.data);
+      const [statsResponse, chartsResponse] = await Promise.all([
+        api.get('/admin/stats'),
+        api.get('/admin/charts')
+      ]);
+      setStats(statsResponse.data);
+      setChartData(chartsResponse.data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to fetch system statistics');
+      setError(err.response?.data?.detail || 'Failed to fetch dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Sample data for charts
-  const userGrowthData = [
-    { name: 'Jan', users: 1200 },
-    { name: 'Feb', users: 1350 },
-    { name: 'Mar', users: 1480 },
-    { name: 'Apr', users: 1620 },
-    { name: 'May', users: 1890 },
-    { name: 'Jun', users: 2100 },
-  ];
-
-  const activityData = [
-    { name: 'Mon', active: 420 },
-    { name: 'Tue', active: 380 },
-    { name: 'Wed', active: 450 },
-    { name: 'Thu', active: 470 },
-    { name: 'Fri', active: 510 },
-    { name: 'Sat', active: 390 },
-    { name: 'Sun', active: 480 },
-  ];
+  // Use real data from API
+  const userGrowthData = chartData?.user_growth || [];
+  const activityData = chartData?.activity_data || [];
 
   const userTypeData = stats ? [
     { name: 'Regular', value: stats.total_users - stats.premium_users - stats.total_admins },
@@ -151,7 +140,7 @@ export function AdminDashboard() {
     { name: 'Admin', value: stats.total_admins },
   ] : [];
 
-  const COLORS = ['#4F46E5', '#059669', '#DC2626'];
+  const COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
 
   if (loading) {
     return (
@@ -221,10 +210,10 @@ export function AdminDashboard() {
           {/* Charts Grid */}
           <div className="grid gap-6 mb-8 md:grid-cols-2 lg:grid-cols-3">
             {/* User Growth Chart */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 border border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <CardTitle>User Growth</CardTitle>
-                <CardDescription>Monthly user registration trend</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">User Growth</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Total users over the last 6 months</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -235,9 +224,9 @@ export function AdminDashboard() {
                         <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.1}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                    <XAxis dataKey="name" stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
-                    <YAxis stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" className="dark:opacity-20" />
+                    <XAxis dataKey="name" stroke="#6B7280" className="dark:stroke-gray-400" style={{ fontSize: '12px', fontWeight: 500 }} />
+                    <YAxis stroke="#6B7280" className="dark:stroke-gray-400" style={{ fontSize: '12px', fontWeight: 500 }} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.98)', 
@@ -260,10 +249,10 @@ export function AdminDashboard() {
             </Card>
 
             {/* User Types Pie Chart */}
-            <Card>
+            <Card className="border border-gray-200 dark:border-gray-700">
               <CardHeader>
-                <CardTitle>User Distribution</CardTitle>
-                <CardDescription>By user type</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">User Distribution</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">By user type</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -290,10 +279,10 @@ export function AdminDashboard() {
           </div>
 
           {/* Activity Chart */}
-          <Card className="mb-8">
+          <Card className="mb-8 border border-gray-200 dark:border-gray-700">
             <CardHeader>
-              <CardTitle>Weekly Activity</CardTitle>
-              <CardDescription>Active users per day</CardDescription>
+              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">Admin Activity</CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">Admin actions over the last 7 days</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
@@ -309,7 +298,7 @@ export function AdminDashboard() {
                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                     }} 
                   />
-                  <Bar dataKey="active" fill="#059669" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="active" fill="#10B981" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -317,24 +306,24 @@ export function AdminDashboard() {
 
           {/* Quick Actions */}
           <div className="grid gap-6 md:grid-cols-3">
-            <Card className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => window.location.href = '/admin/users'}>
+            <Card className="hover:shadow-lg transition-all cursor-pointer group border border-gray-200 dark:border-gray-700" onClick={() => window.location.href = '/admin/users'}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold">Manage Users</h3>
-                    <p className="text-sm text-muted-foreground mt-1">View and manage all users</p>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Manage Users</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View and manage all users</p>
                   </div>
                   <Users className="h-8 w-8 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => window.location.href = '/admin/activity'}>
+            <Card className="hover:shadow-lg transition-all cursor-pointer group border border-gray-200 dark:border-gray-700" onClick={() => window.location.href = '/admin/activity'}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold">Activity Logs</h3>
-                    <p className="text-sm text-muted-foreground mt-1">View recent admin actions</p>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Activity Logs</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">View recent admin actions</p>
                   </div>
                   <Activity className="h-8 w-8 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
@@ -342,12 +331,12 @@ export function AdminDashboard() {
             </Card>
 
             {user?.is_superadmin && (
-              <Card className="hover:shadow-lg transition-all cursor-pointer group" onClick={() => window.location.href = '/admin/settings'}>
+              <Card className="hover:shadow-lg transition-all cursor-pointer group border border-gray-200 dark:border-gray-700" onClick={() => window.location.href = '/admin/settings'}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold">System Settings</h3>
-                      <p className="text-sm text-muted-foreground mt-1">Configure system settings</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">System Settings</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Configure system settings</p>
                     </div>
                     <BarChart3 className="h-8 w-8 text-gray-400 group-hover:text-blue-600 transition-colors" />
                   </div>
