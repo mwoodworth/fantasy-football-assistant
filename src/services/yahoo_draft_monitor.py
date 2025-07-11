@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..models import YahooDraftSession, YahooDraftEvent, YahooLeague
 from ..services.yahoo_integration import YahooIntegrationService as YahooIntegration
+from ..services.websocket_utils import ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -197,8 +198,7 @@ class YahooDraftMonitor:
             "is_user_pick": pick.get("team_key") == session.user_team_key
         }
         
-        # TODO: Implement WebSocket integration
-        logger.info(f"WebSocket event: {event_data}")
+        ws_manager.send_draft_event(str(session.id), event_data['type'], event_data)
         
     def _emit_user_turn_event(self, session: YahooDraftSession):
         """Emit event when it's user's turn."""
@@ -210,8 +210,7 @@ class YahooDraftMonitor:
             "message": "It's your turn to pick!"
         }
         
-        # TODO: Implement WebSocket integration
-        logger.info(f"WebSocket event: {event_data}")
+        ws_manager.send_draft_event(str(session.id), event_data['type'], event_data)
         
         # Create event record
         self._create_event("user_on_clock", event_data)
@@ -225,8 +224,7 @@ class YahooDraftMonitor:
             "message": f"Your turn in {picks_away} picks"
         }
         
-        # TODO: Implement WebSocket integration
-        logger.info(f"WebSocket event: {event_data}")
+        ws_manager.send_draft_event(str(session.id), event_data['type'], event_data)
         
     def _emit_draft_completed_event(self):
         """Emit event when draft is completed."""
@@ -236,8 +234,7 @@ class YahooDraftMonitor:
             "message": "Draft has been completed!"
         }
         
-        # TODO: Implement WebSocket integration
-        logger.info(f"WebSocket event: {event_data}")
+        ws_manager.send_draft_event(str(session.id), event_data['type'], event_data)
         
         # Create event record
         self._create_event("draft_completed", event_data)
@@ -250,8 +247,7 @@ class YahooDraftMonitor:
             "error": error_message
         }
         
-        # TODO: Implement WebSocket integration
-        logger.info(f"WebSocket event: {event_data}")
+        ws_manager.send_draft_event(str(session.id), event_data['type'], event_data)
         
     def _create_event(self, event_type: str, event_data: Dict[str, Any]):
         """Create a draft event record."""

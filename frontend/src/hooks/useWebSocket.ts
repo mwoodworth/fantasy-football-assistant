@@ -49,8 +49,8 @@ export function useWebSocket({
   const connect = useCallback(() => {
     if (!draftSessionId || !user) return;
 
-    // Connect to WebSocket server
-    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:6001', {
+    // Connect to WebSocket server (same as API server)
+    const socket = io(import.meta.env.VITE_WS_URL || 'http://localhost:8000', {
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       auth: {

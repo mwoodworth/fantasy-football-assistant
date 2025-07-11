@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { Alert } from '../components/common/Alert';
+import { Badge } from '../components/common/Badge';
 import { YahooDraftBoard } from '../components/yahoo/YahooDraftBoard';
 import { YahooDraftRecommendations } from '../components/yahoo/YahooDraftRecommendations';
 import { YahooDraftLiveTracker } from '../components/yahoo/YahooDraftLiveTracker';
@@ -22,7 +23,30 @@ export const YahooDraftRoomPage: React.FC = () => {
   const [draftPosition, setDraftPosition] = useState(1);
 
   // WebSocket connection for real-time updates
-  const { isConnected, lastMessage } = useWebSocket();
+  const { isConnected, lastUpdate } = useWebSocket({
+    draftSessionId: draftSession?.session_id,
+    onPickMade: (data) => {
+      console.log('Pick made:', data);
+      // Refresh draft status when a pick is made
+      refreshDraftStatus();
+    },
+    onUserOnClock: (data) => {
+      toast.success('It\'s your turn to pick!', {
+        duration: 10000,
+        icon: '🎯'
+      });
+      refreshDraftStatus();
+    },
+    onStatusChange: (data) => {
+      if (data.status === 'completed') {
+        toast.success('Draft completed!');
+        setDraftSession(prev => prev ? { ...prev, status: 'completed' } : null);
+      }
+    },
+    onSyncError: (data) => {
+      toast.error(`Sync error: ${data.error}`);
+    }
+  });
 
   useEffect(() => {
     if (leagueKey) {
@@ -30,47 +54,6 @@ export const YahooDraftRoomPage: React.FC = () => {
     }
   }, [leagueKey]);
 
-  useEffect(() => {
-    // Handle WebSocket messages
-    if (lastMessage && draftSession) {
-      const data = JSON.parse(lastMessage.data);
-      
-      if (data.session_id === draftSession.session_id) {
-        switch (data.type) {
-          case 'user_on_clock':
-            toast.success('It\'s your turn to pick!', {
-              duration: 10000,
-              icon: '🎯'
-            });
-            // Refresh draft status
-            refreshDraftStatus();
-            break;
-            
-          case 'pick_made':
-            if (data.is_user_pick) {
-              toast.success(`You drafted ${data.player_name}`);
-            }
-            // Refresh will happen in live tracker
-            break;
-            
-          case 'turn_approaching':
-            toast.info(`Your turn in ${data.picks_away} picks`, {
-              duration: 5000
-            });
-            break;
-            
-          case 'draft_completed':
-            toast.success('Draft completed!');
-            setDraftSession(prev => prev ? { ...prev, status: 'completed' } : null);
-            break;
-            
-          case 'sync_error':
-            toast.error(`Sync error: ${data.error}`);
-            break;
-        }
-      }
-    }
-  }, [lastMessage, draftSession]);
 
   const loadLeagueAndDraft = async () => {
     try {
@@ -224,10 +207,27 @@ export const YahooDraftRoomPage: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Yahoo Draft Room</h1>
-        <p className="text-muted-foreground mt-2">
-          {league?.name} - Pick #{draftSession.user_draft_position}
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold">Yahoo Draft Room</h1>
+            <p className="text-muted-foreground mt-2">
+              {league?.name} - Pick #{draftSession.user_draft_position}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <Badge variant="success" className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                Live Connected
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <div className="w-2 h-2 bg-gray-500 rounded-full" />
+                Connecting...
+              </Badge>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
