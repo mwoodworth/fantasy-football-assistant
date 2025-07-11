@@ -172,3 +172,12 @@ export const yahooService = {
     return response.data;
   }
 };
+
+// Re-export types for better module resolution
+export type {
+  YahooAuthStatus as YahooAuthStatusType,
+  YahooLeague as YahooLeagueType,
+  YahooTeam as YahooTeamType,
+  YahooPlayer as YahooPlayerType,
+  YahooTransaction as YahooTransactionType
+};
