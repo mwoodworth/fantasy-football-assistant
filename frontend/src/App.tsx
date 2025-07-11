@@ -26,6 +26,8 @@ import { AdminSettingsPage } from './pages/AdminSettingsPage';
 // Components
 import { MainLayout } from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AdminLayout } from './components/admin/AdminLayout';
+import { AdminGuard } from './components/auth/AdminGuard';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -80,10 +82,23 @@ function App() {
             <Route path="draft-test" element={<DraftTest />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="admin" element={<AdminDashboard />} />
-            <Route path="admin/users" element={<AdminUsersPage />} />
-            <Route path="admin/activity" element={<AdminActivityPage />} />
-            <Route path="admin/settings" element={<AdminSettingsPage />} />
+          </Route>
+
+          {/* Admin routes with separate layout */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute>
+                <AdminGuard>
+                  <AdminLayout />
+                </AdminGuard>
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="activity" element={<AdminActivityPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
         </Routes>
       </Router>

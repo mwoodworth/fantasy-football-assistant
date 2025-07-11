@@ -2,18 +2,32 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { Loader2, Search, Shield, ShieldCheck, User, Ban, CheckCircle, AlertCircle, Edit } from 'lucide-react';
+import { 
+  Search, 
+  Filter,
+  MoreVertical,
+  UserCheck,
+  UserX,
+  Shield,
+  ShieldOff,
+  Mail,
+  Calendar,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
+} from 'lucide-react';
 import api from '../services/api';
-import { useAuthStore } from '../store/useAuthStore';
-import { AdminGuard } from '../components/auth/AdminGuard';
 import { format } from 'date-fns';
+import { cn } from '../utils/cn';
 
-interface UserData {
+interface User {
   id: number;
   email: string;
   username: string;
@@ -28,25 +42,42 @@ interface UserData {
 }
 
 export function AdminUsersPage() {
-  const { user: currentUser } = useAuthStore();
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Filters
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const usersPerPage = 10;
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [search, statusFilter, roleFilter, currentPage]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin/users');
+      const params: any = {
+        skip: (currentPage - 1) * usersPerPage,
+        limit: usersPerPage,
+      };
+      
+      if (search) params.search = search;
+      if (statusFilter !== 'all') params.is_active = statusFilter === 'active';
+      if (roleFilter === 'admin') params.is_admin = true;
+      
+      const response = await api.get('/admin/users', { params });
       setUsers(response.data);
+      
+      // Calculate total pages (would come from API in real implementation)
+      setTotalPages(Math.ceil(response.data.length / usersPerPage));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to fetch users');
     } finally {
@@ -54,281 +85,321 @@ export function AdminUsersPage() {
     }
   };
 
-  const handleSuspendUser = async (userId: number) => {
+  const handleUserAction = async (userId: number, action: string) => {
     try {
-      setActionLoading(true);
-      await api.post(`/admin/users/${userId}/suspend`);
-      await fetchUsers();
-      setShowEditDialog(false);
+      setError(null);
+      setSuccess(null);
+      
+      if (action === 'suspend') {
+        await api.post(`/admin/users/${userId}/suspend`, { reason: 'Admin action' });
+        setSuccess('User suspended successfully');
+      } else if (action === 'activate') {
+        await api.post(`/admin/users/${userId}/activate`);
+        setSuccess('User activated successfully');
+      } else if (action === 'grant-admin') {
+        await api.post(`/admin/grant-admin/${userId}`);
+        setSuccess('Admin privileges granted successfully');
+      } else if (action === 'revoke-admin') {
+        await api.post(`/admin/revoke-admin/${userId}`);
+        setSuccess('Admin privileges revoked successfully');
+      }
+      
+      fetchUsers();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to suspend user');
-    } finally {
-      setActionLoading(false);
+      setError(err.response?.data?.detail || `Failed to ${action} user`);
     }
   };
 
-  const handleActivateUser = async (userId: number) => {
-    try {
-      setActionLoading(true);
-      await api.post(`/admin/users/${userId}/activate`);
-      await fetchUsers();
-      setShowEditDialog(false);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to activate user');
-    } finally {
-      setActionLoading(false);
+  const getRoleBadge = (user: User) => {
+    if (user.is_superadmin) {
+      return <Badge className="bg-purple-100 text-purple-800">Superadmin</Badge>;
     }
-  };
-
-  const handleGrantAdmin = async (userId: number) => {
-    try {
-      setActionLoading(true);
-      await api.post(`/admin/users/${userId}/grant-admin`);
-      await fetchUsers();
-      setShowEditDialog(false);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to grant admin privileges');
-    } finally {
-      setActionLoading(false);
+    if (user.is_admin) {
+      return <Badge className="bg-blue-100 text-blue-800">Admin</Badge>;
     }
-  };
-
-  const handleRevokeAdmin = async (userId: number) => {
-    try {
-      setActionLoading(true);
-      await api.post(`/admin/users/${userId}/revoke-admin`);
-      await fetchUsers();
-      setShowEditDialog(false);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to revoke admin privileges');
-    } finally {
-      setActionLoading(false);
+    if (user.is_premium) {
+      return <Badge className="bg-green-100 text-green-800">Premium</Badge>;
     }
+    return <Badge variant="secondary">Regular</Badge>;
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = 
-      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.first_name && user.first_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (user.last_name && user.last_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && user.is_active) ||
-      (statusFilter === 'suspended' && !user.is_active) ||
-      (statusFilter === 'admin' && (user.is_admin || user.is_superadmin)) ||
-      (statusFilter === 'premium' && user.is_premium);
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const getUserRole = (user: UserData) => {
-    if (user.is_superadmin) return 'superadmin';
-    if (user.is_admin) return 'admin';
-    return 'user';
-  };
-
-  const getRoleBadge = (user: UserData) => {
-    const role = getUserRole(user);
-    switch (role) {
-      case 'superadmin':
-        return <Badge variant="destructive"><ShieldCheck className="w-3 h-3 mr-1" />Super Admin</Badge>;
-      case 'admin':
-        return <Badge variant="secondary"><Shield className="w-3 h-3 mr-1" />Admin</Badge>;
-      default:
-        return <Badge variant="outline"><User className="w-3 h-3 mr-1" />User</Badge>;
-    }
-  };
-
-  if (loading) {
-    return (
-      <AdminGuard>
-        <div className="flex items-center justify-center h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </AdminGuard>
+  const getStatusBadge = (user: User) => {
+    return user.is_active ? (
+      <Badge className="bg-green-100 text-green-800">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Active
+      </Badge>
+    ) : (
+      <Badge className="bg-red-100 text-red-800">
+        <XCircle className="h-3 w-3 mr-1" />
+        Suspended
+      </Badge>
     );
-  }
+  };
 
   return (
-    <AdminGuard>
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>User Management</CardTitle>
-            <CardDescription>View and manage all system users</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="flex gap-4 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="Search users..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="admin">Admins</SelectItem>
-                  <SelectItem value="premium">Premium</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>User</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Premium</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead>Last Login</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{user.username}</div>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
-                          {(user.first_name || user.last_name) && (
-                            <div className="text-sm text-muted-foreground">
-                              {user.first_name} {user.last_name}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{getRoleBadge(user)}</TableCell>
-                      <TableCell>
-                        {user.is_active ? (
-                          <Badge variant="success"><CheckCircle className="w-3 h-3 mr-1" />Active</Badge>
-                        ) : (
-                          <Badge variant="destructive"><Ban className="w-3 h-3 mr-1" />Suspended</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {user.is_premium ? (
-                          <Badge variant="default">Premium</Badge>
-                        ) : (
-                          <Badge variant="outline">Free</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{format(new Date(user.created_at), 'MMM d, yyyy')}</TableCell>
-                      <TableCell>
-                        {user.last_login ? format(new Date(user.last_login), 'MMM d, yyyy') : 'Never'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowEditDialog(true);
-                          }}
-                          disabled={user.id === currentUser?.id}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Manage User</DialogTitle>
-              <DialogDescription>
-                Update user settings for {selectedUser?.username}
-              </DialogDescription>
-            </DialogHeader>
-            {selectedUser && (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium">Account Status</h4>
-                  {selectedUser.is_active ? (
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleSuspendUser(selectedUser.id)}
-                      disabled={actionLoading}
-                      className="w-full"
-                    >
-                      {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
-                      Suspend User
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="default"
-                      onClick={() => handleActivateUser(selectedUser.id)}
-                      disabled={actionLoading}
-                      className="w-full"
-                    >
-                      {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                      Activate User
-                    </Button>
-                  )}
-                </div>
-
-                {currentUser?.is_superadmin && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Admin Privileges</h4>
-                    {selectedUser.is_admin || selectedUser.is_superadmin ? (
-                      <Button
-                        variant="outline"
-                        onClick={() => handleRevokeAdmin(selectedUser.id)}
-                        disabled={actionLoading || selectedUser.is_superadmin}
-                        className="w-full"
-                      >
-                        {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
-                        Revoke Admin
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        onClick={() => handleGrantAdmin(selectedUser.id)}
-                        disabled={actionLoading}
-                        className="w-full"
-                      >
-                        {actionLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
-                        Grant Admin
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <div className="p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">User Management</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Manage user accounts, roles, and permissions
+        </p>
       </div>
-    </AdminGuard>
+
+      {error && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="mb-6 bg-green-50 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">{success}</AlertDescription>
+        </Alert>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>All Users</CardTitle>
+              <CardDescription>View and manage user accounts</CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                Export CSV
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search by name, email, or username..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-10"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={(value) => {
+              setStatusFilter(value);
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active Only</SelectItem>
+                <SelectItem value="suspended">Suspended Only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={roleFilter} onValueChange={(value) => {
+              setRoleFilter(value);
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger className="w-[180px]">
+                <Shield className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="admin">Admins Only</SelectItem>
+                <SelectItem value="premium">Premium Only</SelectItem>
+                <SelectItem value="regular">Regular Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    User
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Joined
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Last Active
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                      No users found
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold">
+                              {user.username.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {user.first_name && user.last_name
+                                ? `${user.first_name} ${user.last_name}`
+                                : user.username}
+                            </div>
+                            <div className="text-sm text-gray-500 flex items-center">
+                              <Mail className="h-3 w-3 mr-1" />
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getStatusBadge(user)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getRoleBadge(user)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {format(new Date(user.created_at), 'MMM d, yyyy')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.last_login
+                          ? format(new Date(user.last_login), 'MMM d, yyyy')
+                          : 'Never'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end space-x-2">
+                          {user.is_active ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleUserAction(user.id, 'suspend')}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <UserX className="h-4 w-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleUserAction(user.id, 'activate')}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <UserCheck className="h-4 w-4" />
+                            </Button>
+                          )}
+                          
+                          {!user.is_superadmin && (
+                            <>
+                              {user.is_admin ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleUserAction(user.id, 'revoke-admin')}
+                                  className="text-orange-600 hover:text-orange-700"
+                                >
+                                  <ShieldOff className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleUserAction(user.id, 'grant-admin')}
+                                  className="text-blue-600 hover:text-blue-700"
+                                >
+                                  <Shield className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </>
+                          )}
+                          
+                          <Button size="sm" variant="ghost">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 px-2">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
