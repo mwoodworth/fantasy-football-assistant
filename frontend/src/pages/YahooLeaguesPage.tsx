@@ -253,10 +253,24 @@ export const YahooLeaguesPage: React.FC = () => {
                 )}
 
                 <div className="flex gap-2 pt-2">
+                  {league.draft_status === 'drafting' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/yahoo/draft/${league.league_key}`);
+                      }}
+                    >
+                      <Trophy className="w-4 h-4 mr-1" />
+                      Enter Draft
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
-                    className="flex-1"
+                    className={league.draft_status === 'drafting' ? '' : 'flex-1'}
                     onClick={(e) => {
                       e.stopPropagation();
                       navigate(`/yahoo/leagues/${league.league_key}`);
@@ -265,23 +279,25 @@ export const YahooLeaguesPage: React.FC = () => {
                     <ExternalLink className="w-4 h-4 mr-1" />
                     View
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSync(league.league_key);
-                    }}
-                    disabled={syncing === league.league_key}
-                  >
-                    {syncing === league.league_key ? (
-                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-1" />
-                    )}
-                    Sync
-                  </Button>
+                  {league.draft_status !== 'drafting' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSync(league.league_key);
+                      }}
+                      disabled={syncing === league.league_key}
+                    >
+                      {syncing === league.league_key ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-1" />
+                      )}
+                      Sync
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

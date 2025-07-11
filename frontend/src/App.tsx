@@ -13,6 +13,7 @@ import { PlayerDetailPage } from './pages/PlayerDetailPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { ESPNLeaguesPage } from './pages/ESPNLeaguesPage';
 import { YahooLeaguesPage } from './pages/YahooLeaguesPage';
+import { YahooDraftRoomPage } from './pages/YahooDraftRoomPage';
 import { DraftRoomPage } from './pages/DraftRoomPage';
 import { DraftTest } from './pages/DraftTest';
 import { AIAssistantPage } from './pages/AIAssistantPage';
@@ -70,6 +71,7 @@ function App() {
             <Route path="teams" element={<TeamsPage />} />
             <Route path="espn/leagues" element={<ESPNLeaguesPage />} />
             <Route path="yahoo/leagues" element={<YahooLeaguesPage />} />
+            <Route path="yahoo/draft/:leagueKey" element={<YahooDraftRoomPage />} />
             <Route path="espn/draft/:sessionId" element={<DraftRoomPage />} />
             <Route path="draft-test" element={<DraftTest />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />

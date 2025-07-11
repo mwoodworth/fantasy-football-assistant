@@ -256,6 +256,46 @@ class YahooFantasyClient:
         
         return transactions
     
+    def get_league_players(self, league_key: str, status: str = "ALL", 
+                         position: Optional[str] = None, 
+                         start: int = 0, count: int = 100) -> List[Dict[str, Any]]:
+        """Get all players in a league.
+        
+        Args:
+            league_key: Yahoo league key
+            status: Player status filter (ALL, A for available, T for taken)
+            position: Optional position filter
+            start: Starting index for pagination
+            count: Number of results to return
+            
+        Returns:
+            List of player dictionaries
+        """
+        endpoint = f"league/{league_key}/players"
+        params = {
+            "start": start,
+            "count": count
+        }
+        
+        filters = []
+        if status != "ALL":
+            filters.append(f"status={status}")
+        if position:
+            filters.append(f"position={position}")
+            
+        if filters:
+            endpoint += ";" + ";".join(filters)
+        
+        data = self._make_request(endpoint, params)
+        players_data = data.get("fantasy_content", {}).get("league", {}).get("players", {})
+        
+        players = []
+        for key, value in players_data.items():
+            if key.isdigit() and "player" in value:
+                players.append(value["player"])
+        
+        return players
+    
     def get_league_draft_results(self, league_key: str) -> List[Dict[str, Any]]:
         """Get draft results for a league.
         

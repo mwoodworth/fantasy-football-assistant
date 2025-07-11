@@ -15,7 +15,14 @@ from .espn_league import (
     UserLeagueSettings
 )
 from .espn_team import ESPNTeam, TradeRecommendation, TeamSyncLog
-from .yahoo_league import YahooLeague, YahooTeam, YahooPlayer
+from .yahoo_league import (
+    YahooLeague, 
+    YahooTeam, 
+    YahooPlayer,
+    YahooDraftSession,
+    YahooDraftRecommendation,
+    YahooDraftEvent
+)
 
 __all__ = [
     "Base",
@@ -42,5 +49,8 @@ __all__ = [
     "TeamSyncLog",
     "YahooLeague",
     "YahooTeam",
-    "YahooPlayer"
+    "YahooPlayer",
+    "YahooDraftSession",
+    "YahooDraftRecommendation",
+    "YahooDraftEvent"
 ]

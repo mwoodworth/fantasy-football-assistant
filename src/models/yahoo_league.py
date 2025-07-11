@@ -137,3 +137,153 @@ class YahooPlayer(Base):
     
     def __repr__(self):
         return f"<YahooPlayer {self.name_full} ({self.player_key})>"
+
+
+class YahooDraftSession(Base):
+    """Yahoo draft session for live draft tracking."""
+    
+    __tablename__ = "yahoo_draft_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    league_id = Column(Integer, ForeignKey("yahoo_leagues.id"), nullable=False)
+    session_token = Column(String, unique=True, nullable=False, index=True)
+    
+    # Draft state
+    draft_status = Column(String, default="predraft")  # predraft, drafting, completed
+    current_pick = Column(Integer, default=1)
+    current_round = Column(Integer, default=1)
+    draft_order = Column(JSON)  # Team order for snake draft
+    snake_draft = Column(Boolean, default=True)
+    
+    # User's position
+    user_draft_position = Column(Integer)
+    user_team_key = Column(String)
+    
+    # Draft picks made so far
+    drafted_players = Column(JSON, default=list)  # List of {pick, round, team_key, player_key, player_name}
+    
+    # Sync settings
+    live_sync_enabled = Column(Boolean, default=True)
+    last_sync = Column(DateTime)
+    sync_interval_seconds = Column(Integer, default=10)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime)
+    
+    # Relationships
+    user = relationship("User")
+    league = relationship("YahooLeague")
+    recommendations = relationship("YahooDraftRecommendation", back_populates="draft_session", cascade="all, delete-orphan")
+    events = relationship("YahooDraftEvent", back_populates="draft_session", cascade="all, delete-orphan")
+    
+    def get_next_pick_number(self, current_pick: int, current_round: int, num_teams: int) -> int:
+        """Calculate next pick number in snake draft."""
+        if self.snake_draft:
+            if current_round % 2 == 1:  # Odd round (1, 3, 5...)
+                if current_pick % num_teams == 0:  # Last pick of round
+                    return current_pick + 1
+                else:
+                    return current_pick + 1
+            else:  # Even round (2, 4, 6...)
+                if current_pick % num_teams == 1:  # First pick of round
+                    return current_pick + 1
+                else:
+                    return current_pick + 1
+        else:
+            return current_pick + 1
+    
+    def get_picks_until_user_turn(self, num_teams: int) -> int:
+        """Calculate how many picks until user's turn."""
+        current_position = ((self.current_pick - 1) % num_teams) + 1
+        
+        if self.snake_draft and self.current_round % 2 == 0:
+            # Even round - reverse order
+            current_position = num_teams - current_position + 1
+        
+        if current_position < self.user_draft_position:
+            return self.user_draft_position - current_position
+        else:
+            # User's turn passed in this round, calculate for next round
+            if self.snake_draft:
+                # In snake draft, position reverses each round
+                if self.current_round % 2 == 1:
+                    # Currently odd round, next will be even (reversed)
+                    return (num_teams - current_position) + (num_teams - self.user_draft_position + 1)
+                else:
+                    # Currently even round, next will be odd (normal)
+                    return (num_teams - current_position) + self.user_draft_position
+            else:
+                return num_teams - current_position + self.user_draft_position
+    
+    def __repr__(self):
+        return f"<YahooDraftSession {self.id} - League {self.league_id}>"
+
+
+class YahooDraftRecommendation(Base):
+    """AI-generated draft recommendations for Yahoo drafts."""
+    
+    __tablename__ = "yahoo_draft_recommendations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_session_id = Column(Integer, ForeignKey("yahoo_draft_sessions.id"), nullable=False)
+    
+    # Recommendation data
+    recommended_players = Column(JSON)  # List of recommended players with analysis
+    primary_recommendation = Column(JSON)  # Top recommended player
+    
+    # AI insights
+    positional_needs = Column(JSON)  # Analysis of team needs by position
+    value_picks = Column(JSON)  # Players providing best value at current pick
+    sleepers = Column(JSON)  # Potential sleeper picks
+    avoid_players = Column(JSON)  # Players to avoid with reasoning
+    
+    # Scoring and confidence
+    confidence_score = Column(Float)  # 0-1 confidence in recommendations
+    ai_insights = Column(String)  # Text explanation from AI
+    
+    # Context used for generation
+    current_pick = Column(Integer)
+    current_round = Column(Integer)
+    team_roster = Column(JSON)  # Current roster state
+    available_players = Column(JSON)  # Top available players snapshot
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    draft_session = relationship("YahooDraftSession", back_populates="recommendations")
+    
+    def __repr__(self):
+        return f"<YahooDraftRecommendation {self.id} - Pick {self.current_pick}>"
+
+
+class YahooDraftEvent(Base):
+    """Track draft events for Yahoo drafts."""
+    
+    __tablename__ = "yahoo_draft_events"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    draft_session_id = Column(Integer, ForeignKey("yahoo_draft_sessions.id"), nullable=False)
+    
+    # Event details
+    event_type = Column(String, nullable=False)  # pick_made, draft_started, draft_completed, sync_error
+    event_data = Column(JSON)  # Event-specific data
+    
+    # Pick details (if event_type is pick_made)
+    pick_number = Column(Integer)
+    round_number = Column(Integer)
+    team_key = Column(String)
+    player_key = Column(String)
+    player_name = Column(String)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    draft_session = relationship("YahooDraftSession", back_populates="events")
+    
+    def __repr__(self):
+        return f"<YahooDraftEvent {self.event_type} - {self.id}>"

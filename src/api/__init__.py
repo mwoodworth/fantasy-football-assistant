@@ -12,6 +12,7 @@ from .ai import router as ai_router
 from .dashboard import router as dashboard_router
 from .teams import router as teams_router
 from .yahoo import router as yahoo_router
+from .yahoo_draft import router as yahoo_draft_router
 
 __all__ = [
     "auth_router",
@@ -23,5 +24,6 @@ __all__ = [
     "ai_router",
     "dashboard_router",
     "teams_router",
-    "yahoo_router"
+    "yahoo_router",
+    "yahoo_draft_router"
 ]

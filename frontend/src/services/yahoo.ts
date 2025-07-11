@@ -1,5 +1,14 @@
 import axios from 'axios';
-import type { YahooAuthStatus, YahooLeague, YahooTeam, YahooPlayer, YahooTransaction } from './yahooTypes';
+import type { 
+  YahooAuthStatus, 
+  YahooLeague, 
+  YahooTeam, 
+  YahooPlayer, 
+  YahooTransaction,
+  YahooDraftSession,
+  YahooDraftRecommendation,
+  YahooDraftStatus
+} from './yahooTypes';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
@@ -103,6 +112,69 @@ export const yahooService = {
   // Draft
   async getDraftResults(leagueKey: string): Promise<any[]> {
     const response = await axios.get(`${API_BASE_URL}/yahoo/leagues/${leagueKey}/draft`);
+    return response.data;
+  },
+
+  // Live Draft
+  async startDraftSession(
+    leagueKey: string, 
+    draftPosition: number
+  ): Promise<YahooDraftSession> {
+    const response = await axios.post(`${API_BASE_URL}/yahoo/draft/start`, {
+      league_key: leagueKey,
+      draft_position: draftPosition
+    });
+    return response.data;
+  },
+
+  async getDraftSession(sessionId: number): Promise<YahooDraftSession> {
+    const response = await axios.get(`${API_BASE_URL}/yahoo/draft/session/${sessionId}`);
+    return response.data;
+  },
+
+  async getDraftRecommendations(
+    sessionId: number,
+    forceRefresh: boolean = false
+  ): Promise<YahooDraftRecommendation> {
+    const params = new URLSearchParams();
+    if (forceRefresh) params.append('force_refresh', 'true');
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/yahoo/draft/${sessionId}/recommendations?${params}`
+    );
+    return response.data;
+  },
+
+  async getLiveDraftStatus(sessionId: number): Promise<YahooDraftStatus> {
+    const response = await axios.get(`${API_BASE_URL}/yahoo/draft/${sessionId}/live-status`);
+    return response.data;
+  },
+
+  async toggleDraftSync(sessionId: number, enable: boolean): Promise<{ sync_enabled: boolean; message: string }> {
+    const response = await axios.post(`${API_BASE_URL}/yahoo/draft/${sessionId}/toggle-sync`, {
+      enable
+    });
+    return response.data;
+  },
+
+  async syncDraft(sessionId: number): Promise<{
+    success: boolean;
+    current_pick: number;
+    current_round: number;
+    total_picks: number;
+    message: string;
+  }> {
+    const response = await axios.post(`${API_BASE_URL}/yahoo/draft/${sessionId}/sync`);
+    return response.data;
+  },
+
+  async getDraftStatus(sessionId: number): Promise<any> {
+    const response = await axios.get(`${API_BASE_URL}/yahoo/draft/${sessionId}/status`);
+    return response.data;
+  },
+
+  async endDraftSession(sessionId: number): Promise<{ message: string; session_id: number; total_picks: number }> {
+    const response = await axios.delete(`${API_BASE_URL}/yahoo/draft/${sessionId}`);
     return response.data;
   }
 };
