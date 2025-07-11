@@ -308,6 +308,19 @@ class ESPNServiceClient:
             }
         )
     
+    # Transaction Methods
+    async def get_transaction_history(self, league_id: int, season: int = 2024, 
+                                    limit: int = 50, offset: int = 0,
+                                    espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Get transaction history for a league"""
+        return await self._make_request(
+            'GET',
+            f'/api/leagues/{league_id}/transactions',
+            params={'season': season, 'limit': limit, 'offset': offset},
+            espn_s2=espn_s2,
+            swid=swid
+        )
+    
     # Draft Methods
     async def get_draft_results(self, league_id: int, season: int = 2024) -> Dict[str, Any]:
         """Get draft results"""
@@ -569,6 +582,41 @@ class ESPNDataService:
                 )
         except Exception as e:
             raise ESPNServiceError(f"Failed to get {position} rankings: {str(e)}")
+    
+    async def get_scoreboard(self, league_id: int, season: int = 2024, week: Optional[int] = None) -> Dict[str, Any]:
+        """Get league scoreboard"""
+        try:
+            async with self.client as client:
+                return await client.get_scoreboard(league_id, season, week)
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get scoreboard for league {league_id}: {str(e)}")
+    
+    async def get_league_teams(self, league_id: int, season: int = 2024, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Get all teams in league"""
+        try:
+            async with self.client as client:
+                return await client.get_league_teams(league_id, season, espn_s2, swid)
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get teams for league {league_id}: {str(e)}")
+    
+    async def get_team_roster(self, team_id: int, league_id: int, season: int = 2024, 
+                            week: Optional[int] = None, espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Get team roster"""
+        try:
+            async with self.client as client:
+                return await client.get_team_roster(team_id, league_id, season, week, espn_s2, swid)
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get roster for team {team_id}: {str(e)}")
+    
+    async def get_transaction_history(self, league_id: int, season: int = 2024, 
+                                    limit: int = 50, offset: int = 0,
+                                    espn_s2: str = None, swid: str = None) -> Dict[str, Any]:
+        """Get transaction history for a league"""
+        try:
+            async with self.client as client:
+                return await client.get_transaction_history(league_id, season, limit, offset, espn_s2, swid)
+        except Exception as e:
+            raise ESPNServiceError(f"Failed to get transaction history for league {league_id}: {str(e)}")
     
     async def sync_league_players(self, league_id: int, season: int = 2024, force: bool = False) -> Dict[str, Any]:
         """Sync all players from an ESPN league to local database"""

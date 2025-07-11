@@ -146,6 +146,14 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to start draft monitor: {e}")
     
+    # Start live data monitor service
+    try:
+        from .services.live_monitor import live_monitor
+        await live_monitor.start()
+        logger.info("Live data monitor service started")
+    except Exception as e:
+        logger.error(f"Failed to start live data monitor: {e}")
+    
     # Start background sync service (can be enabled via BACKGROUND_SYNC_ENABLED env var)
     if os.getenv('BACKGROUND_SYNC_ENABLED', 'false').lower() == 'true':
         try:
@@ -167,6 +175,14 @@ async def shutdown_event():
         logger.info("Draft monitor service stopped")
     except Exception as e:
         logger.error(f"Error stopping draft monitor: {e}")
+    
+    # Stop live data monitor
+    try:
+        from .services.live_monitor import live_monitor
+        await live_monitor.stop()
+        logger.info("Live data monitor service stopped")
+    except Exception as e:
+        logger.error(f"Error stopping live data monitor: {e}")
     
     # Stop background sync service if running
     if os.getenv('BACKGROUND_SYNC_ENABLED', 'false').lower() == 'true':

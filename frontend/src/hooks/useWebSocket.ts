@@ -8,12 +8,24 @@ interface DraftUpdate {
   timestamp: string;
 }
 
+interface LiveUpdate {
+  data: any;
+  timestamp: string;
+}
+
 interface UseWebSocketOptions {
   draftSessionId?: string | number;
   onPickMade?: (data: any) => void;
   onUserOnClock?: (data: any) => void;
   onStatusChange?: (data: any) => void;
   onSyncError?: (data: any) => void;
+  // Live update handlers
+  onScoreUpdate?: (data: any) => void;
+  onPlayerStatusChange?: (data: any) => void;
+  onLineupAlert?: (data: any) => void;
+  onWaiverProcessed?: (data: any) => void;
+  onTradeUpdate?: (data: any) => void;
+  onLeagueNews?: (data: any) => void;
 }
 
 export function useWebSocket({
@@ -22,6 +34,12 @@ export function useWebSocket({
   onUserOnClock,
   onStatusChange,
   onSyncError,
+  onScoreUpdate,
+  onPlayerStatusChange,
+  onLineupAlert,
+  onWaiverProcessed,
+  onTradeUpdate,
+  onLeagueNews,
 }: UseWebSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -89,10 +107,54 @@ export function useWebSocket({
       }
     });
 
+    // Live update events
+    socket.on('score_update', (update: LiveUpdate) => {
+      console.log('Score update received:', update);
+      onScoreUpdate?.(update.data);
+    });
+
+    socket.on('player_status_change', (update: LiveUpdate) => {
+      console.log('Player status change received:', update);
+      onPlayerStatusChange?.(update.data);
+    });
+
+    socket.on('lineup_alert', (update: LiveUpdate) => {
+      console.log('Lineup alert received:', update);
+      onLineupAlert?.(update.data);
+    });
+
+    socket.on('waiver_processed', (update: LiveUpdate) => {
+      console.log('Waiver processed received:', update);
+      onWaiverProcessed?.(update.data);
+    });
+
+    socket.on('trade_update', (update: LiveUpdate) => {
+      console.log('Trade update received:', update);
+      onTradeUpdate?.(update.data);
+    });
+
+    socket.on('league_news', (update: LiveUpdate) => {
+      console.log('League news received:', update);
+      onLeagueNews?.(update.data);
+    });
+
     return () => {
       socket.disconnect();
     };
-  }, [draftSessionId, user, onPickMade, onUserOnClock, onStatusChange, onSyncError]);
+  }, [
+    draftSessionId,
+    user,
+    onPickMade,
+    onUserOnClock,
+    onStatusChange,
+    onSyncError,
+    onScoreUpdate,
+    onPlayerStatusChange,
+    onLineupAlert,
+    onWaiverProcessed,
+    onTradeUpdate,
+    onLeagueNews,
+  ]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {

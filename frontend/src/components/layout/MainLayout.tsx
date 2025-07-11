@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../utils/cn';
+import { LiveUpdates } from '../LiveUpdates';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
@@ -136,6 +137,9 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Live Updates */}
+      <LiveUpdates />
     </div>
   );
 }

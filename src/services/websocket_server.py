@@ -121,7 +121,9 @@ async def leave_draft_session(sid, data):
         logger.error(f"Error leaving draft session: {e}")
         await sio.emit('error', {'message': str(e)}, to=sid)
 
-# Server-side event emitters (called by draft monitor)
+# Server-side event emitters (called by various services)
+
+# Draft-specific events
 async def emit_draft_update(draft_session_id: str, update_type: str, data: Dict[str, Any]):
     """Emit draft update to all connected clients in a session"""
     room = f"draft_{draft_session_id}"
@@ -154,6 +156,56 @@ async def emit_draft_status_change(draft_session_id: str, status: str):
 async def emit_sync_error(draft_session_id: str, error_message: str):
     """Emit when there's a sync error"""
     await emit_draft_update(draft_session_id, 'sync_error', {'error': error_message})
+
+# League-wide events (not draft-specific)
+async def emit_to_user(user_id: str, event_name: str, data: Dict[str, Any]):
+    """Emit event to all connections for a specific user"""
+    # Find all sockets for this user
+    user_sockets = [sid for sid, uid in connection_manager.user_sessions.items() if uid == str(user_id)]
+    
+    event_data = {
+        'data': data,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    
+    for socket_id in user_sockets:
+        await sio.emit(event_name, event_data, to=socket_id)
+    
+    if user_sockets:
+        logger.info(f"Emitted {event_name} to user {user_id} ({len(user_sockets)} connections)")
+
+async def emit_score_update(user_id: str, game_data: Dict[str, Any]):
+    """Emit live score updates to a user"""
+    await emit_to_user(user_id, 'score_update', game_data)
+
+async def emit_player_status_change(user_id: str, player_data: Dict[str, Any]):
+    """Emit when a player's status changes (injury, etc.)"""
+    await emit_to_user(user_id, 'player_status_change', player_data)
+
+async def emit_lineup_alert(user_id: str, alert_data: Dict[str, Any]):
+    """Emit lineup alerts (inactive players, etc.)"""
+    await emit_to_user(user_id, 'lineup_alert', alert_data)
+
+async def emit_waiver_processed(user_id: str, waiver_data: Dict[str, Any]):
+    """Emit when waiver claims are processed"""
+    await emit_to_user(user_id, 'waiver_processed', waiver_data)
+
+async def emit_trade_update(user_id: str, trade_data: Dict[str, Any]):
+    """Emit trade updates (proposed, accepted, rejected)"""
+    await emit_to_user(user_id, 'trade_update', trade_data)
+
+async def emit_league_news(league_id: str, news_data: Dict[str, Any]):
+    """Emit league-wide news/updates"""
+    # This would need a league room implementation
+    room = f"league_{league_id}"
+    
+    event_data = {
+        'data': news_data,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    
+    await sio.emit('league_news', event_data, room=room)
+    logger.info(f"Emitted league news to league {league_id}")
 
 # Create ASGI app
 def create_socket_app():
