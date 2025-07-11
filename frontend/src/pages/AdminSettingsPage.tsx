@@ -301,12 +301,17 @@ export function AdminSettingsPage() {
                 <CardDescription className="text-gray-600 dark:text-gray-400">Perform system maintenance operations</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800 mb-4">
+                  <p className="text-sm text-blue-800 dark:text-blue-200 font-medium">
+                    These maintenance tasks help keep your system running smoothly. Each task runs in the background without affecting users.
+                  </p>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <Button 
                     onClick={() => performMaintenanceAction('clear-cache')}
                     disabled={maintenanceAction === 'clear-cache'}
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+                    className="border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-white font-medium"
                   >
                     {maintenanceAction === 'clear-cache' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -320,7 +325,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('optimize-database')}
                     disabled={maintenanceAction === 'optimize-database'}
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+                    className="border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-white font-medium"
                   >
                     {maintenanceAction === 'optimize-database' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -334,7 +339,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('clean-logs')}
                     disabled={maintenanceAction === 'clean-logs'}
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+                    className="border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-white font-medium"
                   >
                     {maintenanceAction === 'clean-logs' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -348,7 +353,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('reset-rate-limits')}
                     disabled={maintenanceAction === 'reset-rate-limits'}
                     variant="outline"
-                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
+                    className="border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-800 dark:hover:text-white font-medium"
                   >
                     {maintenanceAction === 'reset-rate-limits' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
