@@ -164,8 +164,8 @@ export function AdminUsersPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>All Users</CardTitle>
-              <CardDescription>View and manage user accounts</CardDescription>
+              <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">All Users</CardTitle>
+              <CardDescription className="text-gray-600 dark:text-gray-400">View and manage user accounts</CardDescription>
             </div>
             <div className="flex items-center space-x-2">
               <Button variant="outline" size="sm">

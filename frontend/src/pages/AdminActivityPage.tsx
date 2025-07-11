@@ -134,8 +134,8 @@ export function AdminActivityPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-xl font-semibold">Recent Activity</CardTitle>
-            <CardDescription>Track all changes made by administrators</CardDescription>
+            <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">Recent Activity</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-400">Track all changes made by administrators</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (

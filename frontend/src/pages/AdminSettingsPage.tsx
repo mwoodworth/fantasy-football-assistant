@@ -141,8 +141,8 @@ export function AdminSettingsPage() {
           <TabsContent value="general" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>General Settings</CardTitle>
-                <CardDescription>Configure general system settings</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">General Settings</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Configure general system settings</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -183,8 +183,8 @@ export function AdminSettingsPage() {
           <TabsContent value="monitoring" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Monitoring Settings</CardTitle>
-                <CardDescription>Configure data monitoring intervals</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">Monitoring Settings</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Configure data monitoring intervals</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -234,8 +234,8 @@ export function AdminSettingsPage() {
           <TabsContent value="rate-limits" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Rate Limiting</CardTitle>
-                <CardDescription>Configure API rate limits</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">Rate Limiting</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Configure API rate limits</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -277,8 +277,8 @@ export function AdminSettingsPage() {
           <TabsContent value="maintenance" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Maintenance Tasks</CardTitle>
-                <CardDescription>Perform system maintenance operations</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">Maintenance Tasks</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Perform system maintenance operations</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
@@ -343,8 +343,8 @@ export function AdminSettingsPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>System Information</CardTitle>
-                <CardDescription>Current system status</CardDescription>
+                <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white">System Information</CardTitle>
+                <CardDescription className="text-gray-600 dark:text-gray-400">Current system status</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3 text-sm">

@@ -77,3 +77,11 @@ class AdminActions:
     # Content moderation
     CONTENT_DELETE = "content.delete"
     CONTENT_MODERATE = "content.moderate"
+    
+    # Admin activities
+    ADMIN_LOGIN = "admin.login"
+    ADMIN_VIEW_STATS = "admin.view_stats"
+    ADMIN_VIEW_USERS = "admin.view_users"
+    ADMIN_VIEW_ACTIVITY = "admin.view_activity"
+    ADMIN_VIEW_SETTINGS = "admin.view_settings"
+    ADMIN_UPDATE_SETTINGS = "admin.update_settings"

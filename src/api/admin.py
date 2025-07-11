@@ -35,6 +35,20 @@ async def list_users(
     admin: User = Depends(get_admin_user)
 ):
     """List all users with optional filters"""
+    # Log admin viewing users
+    log_admin_activity(
+        db, admin.id, AdminActions.ADMIN_VIEW_USERS,
+        details={
+            "action": "viewed user list",
+            "filters": {
+                "search": search,
+                "is_active": is_active,
+                "is_admin": is_admin
+            }
+        },
+        request=request
+    )
+    
     query = db.query(User)
     
     if search:
@@ -232,6 +246,13 @@ async def get_system_stats(
     admin: User = Depends(get_admin_user)
 ):
     """Get system-wide statistics"""
+    # Log admin viewing stats
+    log_admin_activity(
+        db, admin.id, AdminActions.ADMIN_VIEW_STATS,
+        details={"action": "viewed dashboard statistics"},
+        request=request
+    )
+    
     # User stats
     total_users = db.query(User).count()
     active_users = db.query(User).filter(User.is_active == True).count()
@@ -281,6 +302,7 @@ async def get_system_stats(
 
 @router.get("/activity")
 async def get_activity_logs(
+    request: Request,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, le=1000),
     admin_id: Optional[int] = None,
@@ -292,6 +314,14 @@ async def get_activity_logs(
     admin: User = Depends(get_admin_user)
 ):
     """Get admin activity logs with filters"""
+    # Log admin viewing activity logs (but don't create infinite loop)
+    if action != AdminActions.ADMIN_VIEW_ACTIVITY:
+        log_admin_activity(
+            db, admin.id, AdminActions.ADMIN_VIEW_ACTIVITY,
+            details={"action": "viewed activity logs"},
+            request=request
+        )
+    
     query = db.query(AdminActivityLog)
     
     if admin_id:
