@@ -253,7 +253,18 @@ class LiveDataMonitor:
                 if not teams_data or not teams_data.get('success'):
                     continue
                     
-                await self._process_player_status_changes(league, teams_data.get('data', {}))
+                # Extract the actual data, handling both list and dict responses
+                data = teams_data.get('data', {})
+                if isinstance(data, dict) and 'teams' in data:
+                    # If data is a dict with 'teams' key, use it as is
+                    await self._process_player_status_changes(league, data)
+                elif isinstance(data, list):
+                    # If data is a list, pass it directly
+                    await self._process_player_status_changes(league, data)
+                else:
+                    # If data is in an unexpected format, log and skip
+                    logger.warning(f"Unexpected data format for league {league.id}: {type(data)}")
+                    continue
                 self._update_sync_time('player_status', league.id)
                 
             except Exception as e:
@@ -265,7 +276,11 @@ class LiveDataMonitor:
         old_statuses = self.cached_data.get(cache_key, {})
         new_statuses = {}
         
-        teams = roster_data.get('teams', [])
+        # Handle both list and dict formats from ESPN API
+        if isinstance(roster_data, list):
+            teams = roster_data
+        else:
+            teams = roster_data.get('teams', [])
         
         for team in teams:
             team_id = team.get('id')
@@ -332,17 +347,11 @@ class LiveDataMonitor:
                 continue
                 
             try:
-                # Get recent transactions using transaction history
-                transactions = await espn_service.get_transaction_history(
-                    league.espn_league_id,
-                    league.season,
-                    espn_s2=league.espn_s2,
-                    swid=league.swid
-                )
+                # For now, skip transaction history as the endpoint is not implemented
+                # TODO: Implement transaction history endpoint in ESPN bridge service
+                logger.info(f"Skipping league activity check for league {league.id} - endpoint not implemented")
                 
-                if transactions and transactions.get('success'):
-                    await self._process_league_activity(league, transactions['data'])
-                    
+                # Still update sync time to prevent continuous retries
                 self._update_sync_time('league_activity', league.id)
                 
             except Exception as e:
@@ -526,8 +535,16 @@ class LiveDataMonitor:
             lineup_issues = []
             roster_data = roster.get('data', {})
             
+            # Handle both list and dict formats
+            if isinstance(roster_data, list):
+                # If it's a list of entries directly
+                entries = roster_data
+            else:
+                # If it's a dict with entries key
+                entries = roster_data.get('entries', [])
+            
             # Check for injured/bye week players in starting lineup
-            starters = [e for e in roster_data.get('entries', []) 
+            starters = [e for e in entries
                        if e.get('lineupSlotId') not in [20, 21, 23]]  # Not bench/IR slots
             
             for entry in starters:
