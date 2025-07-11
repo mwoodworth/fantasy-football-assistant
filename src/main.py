@@ -22,7 +22,7 @@ import socketio
 from .config import settings
 from .models.database import create_tables, engine
 from .models import Base
-from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, espn_players_enhanced_router, ai_router, dashboard_router, teams_router, yahoo_router, yahoo_draft_router
+from .api import auth_router, players_router, fantasy_router, espn_router, espn_enhanced_router, espn_players_enhanced_router, ai_router, dashboard_router, teams_router, yahoo_router, yahoo_draft_router, admin_router
 from .services.websocket_server import create_socket_app, sio
 from .middleware.rate_limiter import RateLimitMiddleware
 from .middleware.error_handler import setup_exception_handlers
@@ -238,6 +238,7 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")
 app.include_router(yahoo_router, prefix="/api")
 app.include_router(yahoo_draft_router)
+app.include_router(admin_router, prefix="/api")
 
 # Mount static files
 static_path = Path(__file__).parent.parent / "static"
@@ -286,21 +287,13 @@ async def health_check():
 @app.get("/api/metrics")
 async def get_metrics():
     """Get performance metrics"""
-    # Get performance stats from middleware
-    perf_middleware = None
-    for middleware in app.middleware:
-        if hasattr(middleware, 'cls') and middleware.cls.__name__ == 'PerformanceMonitoringMiddleware':
-            perf_middleware = middleware
-            break
-    
-    if perf_middleware and hasattr(perf_middleware, 'app'):
-        stats = perf_middleware.app.get_stats()
-        return {
-            "endpoint_stats": stats,
-            "timestamp": time.time()
-        }
-    
-    return {"message": "Performance metrics not available"}
+    # For now, return basic metrics
+    # TODO: Implement proper performance metrics collection
+    return {
+        "message": "Performance metrics endpoint",
+        "timestamp": time.time(),
+        "status": "operational"
+    }
 
 # Root endpoint
 @app.get("/", response_class=HTMLResponse)

@@ -8,7 +8,8 @@ from sqlalchemy.orm import relationship
 from .database import Base
 import bcrypt
 import base64
-from typing import Optional
+import json
+from typing import Optional, List, Dict
 
 
 class User(Base):
@@ -22,6 +23,12 @@ class User(Base):
     last_name = Column(String(100))
     is_active = Column(Boolean, default=True)
     is_premium = Column(Boolean, default=False)
+    
+    # Admin fields
+    is_admin = Column(Boolean, default=False)
+    is_superadmin = Column(Boolean, default=False)
+    admin_notes = Column(Text)  # Internal notes about admin actions
+    permissions = Column(Text)  # JSON string of granular permissions
     
     # Fantasy preferences
     favorite_team = Column(String(50))  # NFL team abbreviation
@@ -71,6 +78,51 @@ class User(Base):
         if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
         return self.username
+    
+    def has_permission(self, permission: str) -> bool:
+        """Check if user has a specific permission"""
+        if self.is_superadmin:
+            return True
+        
+        if not self.is_admin:
+            return False
+            
+        if not self.permissions:
+            return False
+            
+        try:
+            perms = json.loads(self.permissions)
+            return permission in perms
+        except (json.JSONDecodeError, TypeError):
+            return False
+    
+    def get_permissions(self) -> List[str]:
+        """Get list of user permissions"""
+        if self.is_superadmin:
+            # Superadmin has all permissions
+            return ["*"]
+            
+        if not self.is_admin or not self.permissions:
+            return []
+            
+        try:
+            return json.loads(self.permissions)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    
+    def set_permissions(self, permissions: List[str]) -> None:
+        """Set user permissions"""
+        self.permissions = json.dumps(permissions)
+    
+    @property
+    def role(self) -> str:
+        """Get user's role"""
+        if self.is_superadmin:
+            return "superadmin"
+        elif self.is_admin:
+            return "admin"
+        else:
+            return "user"
 
     def __repr__(self):
-        return f"<User(id={self.id}, username='{self.username}', email='{self.email}')>"
+        return f"<User(id={self.id}, username='{self.username}', email='{self.email}', role='{self.role}')>"

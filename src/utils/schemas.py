@@ -32,6 +32,8 @@ class UserResponse(UserBase):
     id: int
     is_active: bool
     is_premium: bool
+    is_admin: bool
+    is_superadmin: bool
     default_league_size: int
     preferred_scoring: str
     created_at: datetime

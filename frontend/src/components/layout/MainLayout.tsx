@@ -10,26 +10,35 @@ import {
   LogOut,
   Menu,
   X,
+  Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../../utils/cn';
 import { LiveUpdates } from '../LiveUpdates';
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Players', href: '/players', icon: Users },
-  { name: 'Teams', href: '/teams', icon: TrendingUp },
-  { name: 'ESPN Leagues', href: '/espn/leagues', icon: Trophy },
-  { name: 'Yahoo Leagues', href: '/yahoo/leagues', icon: Trophy },
-  { name: 'AI Assistant', href: '/ai-assistant', icon: MessageSquare },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-];
 
 export function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Build navigation items based on user role
+  const baseNavigation = [
+    { name: 'Dashboard', href: '/dashboard', icon: Home },
+    { name: 'Players', href: '/players', icon: Users },
+    { name: 'Teams', href: '/teams', icon: TrendingUp },
+    { name: 'ESPN Leagues', href: '/espn/leagues', icon: Trophy },
+    { name: 'Yahoo Leagues', href: '/yahoo/leagues', icon: Trophy },
+    { name: 'AI Assistant', href: '/ai-assistant', icon: MessageSquare },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  ];
+
+  // Add admin navigation if user is admin
+  const adminNavigation = user?.is_admin || user?.is_superadmin
+    ? [{ name: 'Admin', href: '/admin', icon: Shield }]
+    : [];
+
+  const navigationItems = [...baseNavigation, ...adminNavigation];
 
   const handleLogout = async () => {
     await logout();
@@ -67,8 +76,9 @@ export function MainLayout() {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
+            {navigationItems.map((item) => {
+              const isActive = location.pathname === item.href || 
+                           (item.href === '/admin' && location.pathname.startsWith('/admin'));
               return (
                 <Link
                   key={item.name}
@@ -128,7 +138,8 @@ export function MainLayout() {
               <Menu className="h-6 w-6" />
             </button>
             <h2 className="text-xl font-semibold text-gray-800">
-              {navigation.find((item) => item.href === location.pathname)?.name || 'Dashboard'}
+              {navigationItems.find((item) => item.href === location.pathname || 
+                                            (item.href === '/admin' && location.pathname.startsWith('/admin')))?.name || 'Dashboard'}
             </h2>
           </div>
         </header>

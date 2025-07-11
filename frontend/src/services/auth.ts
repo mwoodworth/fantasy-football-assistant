@@ -12,6 +12,10 @@ export interface User {
   last_name?: string;
   is_active: boolean;
   is_premium: boolean;
+  is_admin: boolean;
+  is_superadmin: boolean;
+  role: 'user' | 'admin' | 'superadmin';
+  permissions?: string[];
   created_at: string;
   last_login?: string;
 }
