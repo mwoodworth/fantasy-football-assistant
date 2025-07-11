@@ -1,73 +1,13 @@
 import axios from 'axios';
+import type { 
+  YahooAuthStatus, 
+  YahooLeague, 
+  YahooTeam, 
+  YahooPlayer, 
+  YahooTransaction 
+} from '../types/yahoo';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
-
-// Types for Yahoo Fantasy data
-export interface YahooAuthStatus {
-  authenticated: boolean;
-  user_id: number;
-}
-
-export interface YahooLeague {
-  league_key: string;
-  league_id: string;
-  name: string;
-  season: number;
-  num_teams: number;
-  scoring_type: string;
-  draft_status: string;
-  current_week: number;
-  user_team?: YahooTeam;
-  teams?: YahooTeam[];
-}
-
-export interface YahooTeam {
-  team_key: string;
-  team_id: number;
-  name: string;
-  manager_name?: string;
-  logo_url?: string;
-  rank?: number;
-  points_for?: number;
-  points_against?: number;
-  wins?: number;
-  losses?: number;
-  ties?: number;
-  is_owned_by_current_login?: boolean;
-}
-
-export interface YahooPlayer {
-  player_id: string;
-  name: string;
-  first_name: string;
-  last_name: string;
-  position: string;
-  team: string;
-  bye_week: number;
-  status: string;
-  injury_status?: string;
-  ownership: {
-    percentage_owned: number;
-    change: number;
-  };
-  points: {
-    total: number;
-    average: number;
-  };
-  projections: {
-    season: number;
-    week: number;
-  };
-  source: 'yahoo';
-}
-
-export interface YahooTransaction {
-  transaction_key: string;
-  type: string;
-  status: string;
-  timestamp: number;
-  players?: YahooPlayer[];
-}
 
 // Yahoo Fantasy API service
 export const yahooService = {
@@ -173,11 +113,11 @@ export const yahooService = {
   }
 };
 
-// Re-export types for better module resolution
-export type {
-  YahooAuthStatus as YahooAuthStatusType,
-  YahooLeague as YahooLeagueType,
-  YahooTeam as YahooTeamType,
-  YahooPlayer as YahooPlayerType,
-  YahooTransaction as YahooTransactionType
-};
+// Re-export types from the types file
+export type { 
+  YahooAuthStatus, 
+  YahooLeague, 
+  YahooTeam, 
+  YahooPlayer, 
+  YahooTransaction 
+} from '../types/yahoo';
