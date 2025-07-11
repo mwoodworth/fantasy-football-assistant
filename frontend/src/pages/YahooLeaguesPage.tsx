@@ -15,7 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/common/C
 import { Button } from '../components/common/Button';
 import { Alert } from '../components/common/Alert';
 import { Badge } from '../components/common/Badge';
-import { yahooService, YahooLeague, YahooAuthStatus } from '../services/yahoo';
+import { yahooService } from '../services/yahoo';
+import type { YahooLeague, YahooAuthStatus } from '../services/yahooTypes';
 import { toast } from '../utils/toast';
 
 export const YahooLeaguesPage: React.FC = () => {
