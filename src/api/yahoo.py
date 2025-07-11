@@ -25,6 +25,13 @@ async def get_auth_url(
             "auth_url": auth_url,
             "state": state
         }
+    except ValueError as e:
+        if "Yahoo OAuth credentials not configured" in str(e):
+            raise HTTPException(
+                status_code=503, 
+                detail="Yahoo integration is not configured. Please set YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET environment variables."
+            )
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to generate auth URL: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate authorization URL")

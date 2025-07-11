@@ -17,8 +17,15 @@ class YahooIntegrationService:
     """Service for integrating with Yahoo Fantasy Sports."""
     
     def __init__(self):
-        self.oauth_client = YahooOAuthClient()
+        self._oauth_client = None
         self._clients: Dict[int, YahooFantasyClient] = {}
+    
+    @property
+    def oauth_client(self):
+        """Lazy initialization of OAuth client."""
+        if self._oauth_client is None:
+            self._oauth_client = YahooOAuthClient()
+        return self._oauth_client
     
     def get_authorization_url(self, user_id: int) -> tuple[str, str]:
         """Get Yahoo OAuth authorization URL for user.

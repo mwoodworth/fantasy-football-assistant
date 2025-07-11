@@ -18,18 +18,28 @@ class YahooOAuthClient:
     REDIRECT_URI = os.getenv("YAHOO_REDIRECT_URI", "http://localhost:8000/yahoo/callback")
     
     def __init__(self):
-        self.client_id = os.getenv("YAHOO_CLIENT_ID")
-        self.client_secret = os.getenv("YAHOO_CLIENT_SECRET")
+        self.client_id = os.getenv("YAHOO_CLIENT_ID", "")
+        self.client_secret = os.getenv("YAHOO_CLIENT_SECRET", "")
+        self._oauth = None
         
+    def _ensure_configured(self):
+        """Ensure OAuth credentials are configured."""
         if not self.client_id or not self.client_secret:
             raise ValueError("Yahoo OAuth credentials not configured. Set YAHOO_CLIENT_ID and YAHOO_CLIENT_SECRET")
         
-        self.oauth = OAuth2Session(
-            client_id=self.client_id,
-            client_secret=self.client_secret,
-            redirect_uri=self.REDIRECT_URI,
-            scope="fspt-r"  # Fantasy Sports Read permission
-        )
+        if self._oauth is None:
+            self._oauth = OAuth2Session(
+                client_id=self.client_id,
+                client_secret=self.client_secret,
+                redirect_uri=self.REDIRECT_URI,
+                scope="fspt-r"  # Fantasy Sports Read permission
+            )
+    
+    @property
+    def oauth(self):
+        """Get OAuth session, ensuring it's configured."""
+        self._ensure_configured()
+        return self._oauth
     
     def get_authorization_url(self, state: Optional[str] = None) -> tuple[str, str]:
         """Get the authorization URL for user consent.
