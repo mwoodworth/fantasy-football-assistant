@@ -55,24 +55,31 @@ interface StatCardProps {
 
 function StatCard({ title, value, description, icon: Icon, trend, color = "blue" }: StatCardProps) {
   const colorClasses = {
-    blue: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-    green: "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400",
-    purple: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400",
-    orange: "bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400",
+    blue: "bg-blue-600 text-white",
+    green: "bg-emerald-600 text-white",
+    purple: "bg-purple-600 text-white",
+    orange: "bg-orange-600 text-white",
+  };
+
+  const bgClasses = {
+    blue: "from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900",
+    green: "from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900",
+    purple: "from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900",
+    orange: "from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900",
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow">
-      <CardContent className="p-6">
+    <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-0">
+      <CardContent className={cn("p-6 bg-gradient-to-br", bgClasses[color as keyof typeof bgClasses])}>
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">{title}</p>
             <div className="flex items-baseline space-x-2">
-              <h2 className="text-3xl font-bold">{value}</h2>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">{value}</h2>
               {trend !== undefined && (
                 <span className={cn(
-                  "flex items-center text-sm font-medium",
-                  trend > 0 ? "text-green-600" : "text-red-600"
+                  "flex items-center text-sm font-semibold",
+                  trend > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"
                 )}>
                   {trend > 0 ? (
                     <ArrowUpRight className="h-4 w-4" />
@@ -84,10 +91,10 @@ function StatCard({ title, value, description, icon: Icon, trend, color = "blue"
               )}
             </div>
             {description && (
-              <p className="text-xs text-muted-foreground">{description}</p>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-400">{description}</p>
             )}
           </div>
-          <div className={cn("p-3 rounded-lg", colorClasses[color as keyof typeof colorClasses])}>
+          <div className={cn("p-3 rounded-lg shadow-lg", colorClasses[color as keyof typeof colorClasses])}>
             <Icon className="h-6 w-6" />
           </div>
         </div>
@@ -144,7 +151,7 @@ export function AdminDashboard() {
     { name: 'Admin', value: stats.total_admins },
   ] : [];
 
-  const COLORS = ['#3B82F6', '#10B981', '#F59E0B'];
+  const COLORS = ['#4F46E5', '#059669', '#DC2626'];
 
   if (loading) {
     return (
@@ -224,27 +231,28 @@ export function AdminDashboard() {
                   <AreaChart data={userGrowthData}>
                     <defs>
                       <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                        <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#4F46E5" stopOpacity={0.1}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" stroke="#888" />
-                    <YAxis stroke="#888" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="name" stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
+                    <YAxis stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
                     <Tooltip 
                       contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                        border: '1px solid #e0e0e0',
-                        borderRadius: '8px'
+                        backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                       }} 
                     />
                     <Area 
                       type="monotone" 
                       dataKey="users" 
-                      stroke="#3B82F6" 
+                      stroke="#4F46E5" 
                       fillOpacity={1} 
                       fill="url(#colorUsers)" 
-                      strokeWidth={2}
+                      strokeWidth={3}
                     />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -290,17 +298,18 @@ export function AdminDashboard() {
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={activityData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" stroke="#888" />
-                  <YAxis stroke="#888" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="name" stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
+                  <YAxis stroke="#6B7280" style={{ fontSize: '12px', fontWeight: 500 }} />
                   <Tooltip 
                     contentStyle={{ 
-                      backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                      border: '1px solid #e0e0e0',
-                      borderRadius: '8px'
+                      backgroundColor: 'rgba(255, 255, 255, 0.98)', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                     }} 
                   />
-                  <Bar dataKey="active" fill="#10B981" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="active" fill="#059669" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

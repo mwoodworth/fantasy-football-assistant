@@ -108,10 +108,10 @@ export function AdminSettingsPage() {
 
   return (
     <AdminGuard requireSuperAdmin>
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">System Settings</h1>
-          <p className="text-muted-foreground">
+      <div className="p-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Settings</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
             Configure system-wide settings and perform maintenance tasks
           </p>
         </div>
@@ -124,18 +124,18 @@ export function AdminSettingsPage() {
         )}
 
         {success && (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <Check className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          <Alert className="mb-6 bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
+            <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <AlertDescription className="text-emerald-800 dark:text-emerald-200">{success}</AlertDescription>
           </Alert>
         )}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-            <TabsTrigger value="rate-limits">Rate Limits</TabsTrigger>
-            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+            <TabsTrigger value="general" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">General</TabsTrigger>
+            <TabsTrigger value="monitoring" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Monitoring</TabsTrigger>
+            <TabsTrigger value="rate-limits" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Rate Limits</TabsTrigger>
+            <TabsTrigger value="maintenance" className="data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-900">Maintenance</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -146,7 +146,7 @@ export function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Log Level</label>
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">Log Level</label>
                   <Select 
                     value={settings?.log_level || 'INFO'} 
                     onValueChange={(value) => handleSettingChange('log_level', value)}
@@ -164,7 +164,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     Cache Expire Time (seconds)
                   </label>
                   <Input
@@ -172,7 +172,7 @@ export function AdminSettingsPage() {
                     value={settings?.cache_expire_time || 3600}
                     onChange={(e) => handleSettingChange('cache_expire_time', parseInt(e.target.value))}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     How long to cache data before refreshing
                   </p>
                 </div>
@@ -188,7 +188,7 @@ export function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     Draft Monitor Interval (seconds)
                   </label>
                   <Input
@@ -196,13 +196,13 @@ export function AdminSettingsPage() {
                     value={settings?.draft_monitor_interval || 60}
                     onChange={(e) => handleSettingChange('draft_monitor_interval', parseInt(e.target.value))}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     How often to check for draft updates
                   </p>
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     Live Monitor Interval (seconds)
                   </label>
                   <Input
@@ -210,7 +210,7 @@ export function AdminSettingsPage() {
                     value={settings?.live_monitor_interval || 300}
                     onChange={(e) => handleSettingChange('live_monitor_interval', parseInt(e.target.value))}
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                     How often to check for live game updates
                   </p>
                 </div>
@@ -223,7 +223,7 @@ export function AdminSettingsPage() {
                     onChange={(e) => handleSettingChange('disable_espn_sync_logs', e.target.checked)}
                     className="rounded border-gray-300"
                   />
-                  <label htmlFor="disable-espn-logs" className="text-sm font-medium">
+                  <label htmlFor="disable-espn-logs" className="text-sm font-semibold text-gray-900 dark:text-white">
                     Disable ESPN Sync Logs
                   </label>
                 </div>
@@ -239,7 +239,7 @@ export function AdminSettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     Default Rate Limit (requests/minute)
                   </label>
                   <Input
@@ -250,7 +250,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     ESPN API Rate Limit (requests/minute)
                   </label>
                   <Input
@@ -261,7 +261,7 @@ export function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
+                  <label className="text-sm font-semibold text-gray-900 dark:text-white mb-2 block">
                     AI API Rate Limit (requests/hour)
                   </label>
                   <Input
@@ -286,6 +286,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('clear-cache')}
                     disabled={maintenanceAction === 'clear-cache'}
                     variant="outline"
+                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
                   >
                     {maintenanceAction === 'clear-cache' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -299,6 +300,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('optimize-database')}
                     disabled={maintenanceAction === 'optimize-database'}
                     variant="outline"
+                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
                   >
                     {maintenanceAction === 'optimize-database' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -312,6 +314,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('clean-logs')}
                     disabled={maintenanceAction === 'clean-logs'}
                     variant="outline"
+                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
                   >
                     {maintenanceAction === 'clean-logs' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -325,6 +328,7 @@ export function AdminSettingsPage() {
                     onClick={() => performMaintenanceAction('reset-rate-limits')}
                     disabled={maintenanceAction === 'reset-rate-limits'}
                     variant="outline"
+                    className="border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-800"
                   >
                     {maintenanceAction === 'reset-rate-limits' ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -343,18 +347,18 @@ export function AdminSettingsPage() {
                 <CardDescription>Current system status</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Environment:</span>
-                    <Badge variant="outline">Production</Badge>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">Environment:</span>
+                    <Badge className="bg-blue-100 text-blue-900 border border-blue-200 dark:bg-blue-950 dark:text-blue-100 dark:border-blue-800 font-semibold">Production</Badge>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Database:</span>
-                    <Badge variant="outline">SQLite</Badge>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">Database:</span>
+                    <Badge className="bg-purple-100 text-purple-900 border border-purple-200 dark:bg-purple-950 dark:text-purple-100 dark:border-purple-800 font-semibold">SQLite</Badge>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">API Version:</span>
-                    <Badge variant="outline">1.0.0</Badge>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600 dark:text-gray-400 font-medium">API Version:</span>
+                    <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-100 dark:border-emerald-800 font-semibold">1.0.0</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -362,10 +366,11 @@ export function AdminSettingsPage() {
           </TabsContent>
         </Tabs>
 
-        <div className="mt-6 flex justify-end">
+        <div className="mt-8 flex justify-end">
           <Button 
             onClick={saveSettings} 
             disabled={saving || !settings}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6"
           >
             {saving ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

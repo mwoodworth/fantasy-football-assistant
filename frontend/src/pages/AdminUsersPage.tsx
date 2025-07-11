@@ -112,25 +112,25 @@ export function AdminUsersPage() {
 
   const getRoleBadge = (user: User) => {
     if (user.is_superadmin) {
-      return <Badge className="bg-purple-100 text-purple-800">Superadmin</Badge>;
+      return <Badge className="bg-purple-600 text-white font-semibold">Superadmin</Badge>;
     }
     if (user.is_admin) {
-      return <Badge className="bg-blue-100 text-blue-800">Admin</Badge>;
+      return <Badge className="bg-blue-600 text-white font-semibold">Admin</Badge>;
     }
     if (user.is_premium) {
-      return <Badge className="bg-green-100 text-green-800">Premium</Badge>;
+      return <Badge className="bg-emerald-600 text-white font-semibold">Premium</Badge>;
     }
-    return <Badge variant="secondary">Regular</Badge>;
+    return <Badge className="bg-gray-500 text-white font-semibold">Regular</Badge>;
   };
 
   const getStatusBadge = (user: User) => {
     return user.is_active ? (
-      <Badge className="bg-green-100 text-green-800">
+      <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-200 font-semibold">
         <CheckCircle className="h-3 w-3 mr-1" />
         Active
       </Badge>
     ) : (
-      <Badge className="bg-red-100 text-red-800">
+      <Badge className="bg-red-100 text-red-900 border border-red-200 font-semibold">
         <XCircle className="h-3 w-3 mr-1" />
         Suspended
       </Badge>
@@ -303,18 +303,18 @@ export function AdminUsersPage() {
                           {user.is_active ? (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => handleUserAction(user.id, 'suspend')}
-                              className="text-red-600 hover:text-red-700"
+                              className="border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300"
                             >
                               <UserX className="h-4 w-4" />
                             </Button>
                           ) : (
                             <Button
                               size="sm"
-                              variant="ghost"
+                              variant="outline"
                               onClick={() => handleUserAction(user.id, 'activate')}
-                              className="text-green-600 hover:text-green-700"
+                              className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
                             >
                               <UserCheck className="h-4 w-4" />
                             </Button>
@@ -325,18 +325,18 @@ export function AdminUsersPage() {
                               {user.is_admin ? (
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() => handleUserAction(user.id, 'revoke-admin')}
-                                  className="text-orange-600 hover:text-orange-700"
+                                  className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:border-orange-300"
                                 >
                                   <ShieldOff className="h-4 w-4" />
                                 </Button>
                               ) : (
                                 <Button
                                   size="sm"
-                                  variant="ghost"
+                                  variant="outline"
                                   onClick={() => handleUserAction(user.id, 'grant-admin')}
-                                  className="text-blue-600 hover:text-blue-700"
+                                  className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
                                 >
                                   <Shield className="h-4 w-4" />
                                 </Button>

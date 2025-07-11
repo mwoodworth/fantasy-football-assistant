@@ -24,14 +24,14 @@ interface ActivityLog {
 }
 
 const ACTION_ICONS: Record<string, React.ReactNode> = {
-  'USER_CREATED': <User className="h-4 w-4 text-green-600" />,
-  'USER_UPDATED': <Edit className="h-4 w-4 text-blue-600" />,
-  'USER_SUSPENDED': <Ban className="h-4 w-4 text-red-600" />,
-  'USER_ACTIVATED': <CheckCircle className="h-4 w-4 text-green-600" />,
-  'USER_DELETED': <Trash className="h-4 w-4 text-red-600" />,
-  'ADMIN_GRANTED': <Shield className="h-4 w-4 text-purple-600" />,
-  'ADMIN_REVOKED': <Shield className="h-4 w-4 text-orange-600" />,
-  'ADMIN_LOGIN': <User className="h-4 w-4 text-blue-600" />,
+  'USER_CREATED': <User className="h-4 w-4 text-emerald-700" />,
+  'USER_UPDATED': <Edit className="h-4 w-4 text-blue-700" />,
+  'USER_SUSPENDED': <Ban className="h-4 w-4 text-red-700" />,
+  'USER_ACTIVATED': <CheckCircle className="h-4 w-4 text-emerald-700" />,
+  'USER_DELETED': <Trash className="h-4 w-4 text-red-700" />,
+  'ADMIN_GRANTED': <Shield className="h-4 w-4 text-purple-700" />,
+  'ADMIN_REVOKED': <Shield className="h-4 w-4 text-orange-700" />,
+  'ADMIN_LOGIN': <User className="h-4 w-4 text-blue-700" />,
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -90,11 +90,22 @@ export function AdminActivityPage() {
   const uniqueActions = Array.from(new Set(activities.map(a => a.action)));
 
   const getActionBadge = (action: string) => {
-    const icon = ACTION_ICONS[action] || <Activity className="h-4 w-4" />;
+    const icon = ACTION_ICONS[action] || <Activity className="h-4 w-4 text-gray-700" />;
     const label = ACTION_LABELS[action] || action;
     
+    const badgeColors: Record<string, string> = {
+      'USER_CREATED': 'bg-emerald-100 text-emerald-900 border-emerald-200',
+      'USER_UPDATED': 'bg-blue-100 text-blue-900 border-blue-200',
+      'USER_SUSPENDED': 'bg-red-100 text-red-900 border-red-200',
+      'USER_ACTIVATED': 'bg-emerald-100 text-emerald-900 border-emerald-200',
+      'USER_DELETED': 'bg-red-100 text-red-900 border-red-200',
+      'ADMIN_GRANTED': 'bg-purple-100 text-purple-900 border-purple-200',
+      'ADMIN_REVOKED': 'bg-orange-100 text-orange-900 border-orange-200',
+      'ADMIN_LOGIN': 'bg-blue-100 text-blue-900 border-blue-200',
+    };
+    
     return (
-      <Badge variant="outline" className="flex items-center gap-1">
+      <Badge className={`flex items-center gap-1 font-semibold border ${badgeColors[action] || 'bg-gray-100 text-gray-900 border-gray-200'}`}>
         {icon}
         {label}
       </Badge>
@@ -113,11 +124,18 @@ export function AdminActivityPage() {
 
   return (
     <AdminGuard>
-      <div className="container mx-auto px-4 py-8">
+      <div className="p-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Activity Logs</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            View all administrative actions performed in the system
+          </p>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Admin Activity Log</CardTitle>
-            <CardDescription>View all administrative actions performed in the system</CardDescription>
+            <CardTitle className="text-xl font-semibold">Recent Activity</CardTitle>
+            <CardDescription>Track all changes made by administrators</CardDescription>
           </CardHeader>
           <CardContent>
             {error && (
@@ -174,45 +192,45 @@ export function AdminActivityPage() {
               </Select>
             </div>
 
-            <div className="rounded-md border">
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Timestamp</TableHead>
-                    <TableHead>Admin</TableHead>
-                    <TableHead>Action</TableHead>
-                    <TableHead>Target</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>IP Address</TableHead>
+                <TableHeader className="bg-gray-50 dark:bg-gray-800">
+                  <TableRow className="border-b border-gray-200 dark:border-gray-700">
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Admin</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Action</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Target</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">Details</TableHead>
+                    <TableHead className="text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
+                <TableBody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredActivities.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell className="whitespace-nowrap">
+                    <TableRow key={activity.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                      <TableCell className="whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {format(new Date(activity.created_at), 'MMM d, yyyy HH:mm:ss')}
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{activity.admin_username}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white">{activity.admin_username}</div>
                       </TableCell>
                       <TableCell>{getActionBadge(activity.action)}</TableCell>
                       <TableCell>
                         {activity.target_type && activity.target_id && (
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">
                             {activity.target_type} #{activity.target_id}
                           </span>
                         )}
                       </TableCell>
                       <TableCell className="max-w-md">
                         {activity.details && (
-                          <span className="text-sm text-muted-foreground truncate block">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 truncate block">
                             {activity.details}
                           </span>
                         )}
                       </TableCell>
                       <TableCell>
                         {activity.ip_address && (
-                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                          <code className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded font-mono">
                             {activity.ip_address}
                           </code>
                         )}
@@ -224,8 +242,9 @@ export function AdminActivityPage() {
             </div>
 
             {filteredActivities.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No activity logs found matching your filters.
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <Activity className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+                <p className="font-medium">No activity logs found matching your filters</p>
               </div>
             )}
           </CardContent>

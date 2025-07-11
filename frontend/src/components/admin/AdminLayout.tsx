@@ -23,12 +23,12 @@ export function AdminLayout() {
   const location = useLocation();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-950">
       {/* Sidebar */}
-      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-lg">
+      <div className="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 dark:bg-black shadow-xl">
         <div className="flex h-full flex-col">
           {/* Logo/Header */}
-          <div className="flex h-16 items-center px-6 bg-gradient-to-r from-blue-600 to-blue-700">
+          <div className="flex h-16 items-center px-6 bg-gradient-to-r from-indigo-600 to-purple-600">
             <Shield className="h-8 w-8 text-white" />
             <span className="ml-3 text-xl font-bold text-white">Admin Panel</span>
           </div>
@@ -43,17 +43,17 @@ export function AdminLayout() {
                   to={item.href}
                   className={cn(
                     isActive
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
-                      : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
-                    'group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors'
+                      ? 'bg-indigo-700 text-white'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white',
+                    'group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200'
                   )}
                 >
                   <item.icon
                     className={cn(
                       isActive
-                        ? 'text-blue-700 dark:text-blue-400'
-                        : 'text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300',
-                      'mr-3 h-5 w-5 flex-shrink-0'
+                        ? 'text-white'
+                        : 'text-gray-400 group-hover:text-white',
+                      'mr-3 h-5 w-5 flex-shrink-0 transition-colors'
                     )}
                   />
                   {item.name}
@@ -66,10 +66,10 @@ export function AdminLayout() {
           </nav>
 
           {/* Bottom section */}
-          <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+          <div className="border-t border-gray-800 p-4">
             <Link
               to="/dashboard"
-              className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="flex items-center px-3 py-2.5 text-sm font-medium text-gray-300 rounded-lg hover:bg-gray-800 hover:text-white transition-colors"
             >
               <Home className="mr-3 h-5 w-5 text-gray-400" />
               Back to Dashboard
