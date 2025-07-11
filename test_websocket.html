@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .log {
+            background: #f4f4f4;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .connected { background: #d4edda; }
+        .disconnected { background: #f8d7da; }
+        .event { background: #d1ecf1; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Test for Yahoo Draft</h1>
+    
+    <div>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="joinDraft()">Join Draft Session</button>
+        <button onclick="simulatePickMade()">Simulate Pick Made</button>
+        <button onclick="simulateUserOnClock()">Simulate User On Clock</button>
+    </div>
+    
+    <h2>Status: <span id="status">Disconnected</span></h2>
+    
+    <h3>Event Log:</h3>
+    <div id="log"></div>
+    
+    <script>
+        let socket = null;
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+        
+        function log(message, type = '') {
+            const div = document.createElement('div');
+            div.className = 'log ' + type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logEl.prepend(div);
+        }
+        
+        function connect() {
+            if (socket && socket.connected) {
+                log('Already connected', 'connected');
+                return;
+            }
+            
+            socket = io('http://localhost:8000', {
+                path: '/socket.io',
+                transports: ['websocket', 'polling']
+            });
+            
+            socket.on('connect', () => {
+                statusEl.textContent = 'Connected';
+                statusEl.style.color = 'green';
+                log('Connected to server', 'connected');
+            });
+            
+            socket.on('disconnect', () => {
+                statusEl.textContent = 'Disconnected';
+                statusEl.style.color = 'red';
+                log('Disconnected from server', 'disconnected');
+            });
+            
+            socket.on('connected', (data) => {
+                log('Received connected event: ' + JSON.stringify(data), 'event');
+            });
+            
+            socket.on('joined_draft', (data) => {
+                log('Joined draft: ' + JSON.stringify(data), 'event');
+            });
+            
+            socket.on('draft_update', (data) => {
+                log('Draft update: ' + JSON.stringify(data), 'event');
+            });
+            
+            socket.on('error', (error) => {
+                log('Error: ' + JSON.stringify(error), 'disconnected');
+            });
+        }
+        
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+        
+        function joinDraft() {
+            if (!socket || !socket.connected) {
+                log('Not connected', 'disconnected');
+                return;
+            }
+            
+            socket.emit('join_draft_session', {
+                user_id: '1',
+                draft_session_id: 'yahoo_123'
+            });
+            log('Sent join_draft_session event');
+        }
+        
+        function simulatePickMade() {
+            if (!socket || !socket.connected) {
+                log('Not connected', 'disconnected');
+                return;
+            }
+            
+            // This would normally come from the server
+            log('Simulating pick_made event (would come from server)');
+        }
+        
+        function simulateUserOnClock() {
+            if (!socket || !socket.connected) {
+                log('Not connected', 'disconnected');
+                return;
+            }
+            
+            // This would normally come from the server
+            log('Simulating user_on_clock event (would come from server)');
+        }
+        
+        // Auto-connect on load
+        window.onload = () => {
+            log('Page loaded, ready to connect');
+        };
+    </script>
+</body>
+</html>
