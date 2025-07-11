@@ -1,54 +1,52 @@
 #!/usr/bin/env python3
 """
-Script to fix missing columns in draft_sessions table
+Fix draft_sessions table by adding missing columns.
 """
 
-import os
 import sys
-from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
+from pathlib import Path
+from sqlalchemy import text
 
-# Load environment variables
-load_dotenv()
+# Add the src directory to the Python path
+sys.path.insert(0, str(Path(__file__).parent))
 
-# Get database URL from environment or use default
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///./fantasy_football.db')
+from src.models.database import engine
 
 def fix_draft_sessions_table():
     """Add missing columns to draft_sessions table"""
-    engine = create_engine(DATABASE_URL)
     
     with engine.connect() as conn:
-        # Check if columns exist first
+        # Check which columns already exist
         result = conn.execute(text("PRAGMA table_info(draft_sessions)"))
-        existing_columns = [row[1] for row in result]
+        existing_columns = {row[1] for row in result}
         
-        columns_to_add = [
-            ('draft_status', 'VARCHAR(50)', 'pending'),
-            ('current_pick_team_id', 'INTEGER', None),
-            ('pick_deadline', 'DATETIME', None),
-            ('last_espn_sync', 'DATETIME', None),
-            ('sync_errors', 'TEXT', None),
+        print(f"Existing columns: {existing_columns}")
+        
+        # List of columns that should exist (based on the model)
+        required_columns = [
+            ("draft_status", "VARCHAR(20)", "'not_started'"),
+            ("current_pick_team_id", "INTEGER", "NULL"),
+            ("pick_deadline", "DATETIME", "NULL"),
+            ("last_espn_sync", "DATETIME", "NULL"),
+            ("sync_errors", "JSON", "'[]'"),
+            ("is_live_synced", "BOOLEAN", "0"),
+            ("manual_mode", "BOOLEAN", "0"),
         ]
         
-        for column_name, column_type, default_value in columns_to_add:
-            if column_name not in existing_columns:
-                print(f"Adding column {column_name}...")
-                if default_value is not None:
-                    query = f"ALTER TABLE draft_sessions ADD COLUMN {column_name} {column_type} DEFAULT '{default_value}'"
-                else:
-                    query = f"ALTER TABLE draft_sessions ADD COLUMN {column_name} {column_type}"
-                conn.execute(text(query))
-                conn.commit()
-                print(f"✓ Added {column_name}")
+        # Add missing columns
+        for col_name, col_type, default_value in required_columns:
+            if col_name not in existing_columns:
+                try:
+                    alter_sql = f"ALTER TABLE draft_sessions ADD COLUMN {col_name} {col_type} DEFAULT {default_value}"
+                    conn.execute(text(alter_sql))
+                    conn.commit()
+                    print(f"✅ Added column: {col_name}")
+                except Exception as e:
+                    print(f"❌ Error adding column {col_name}: {e}")
             else:
-                print(f"✓ Column {column_name} already exists")
+                print(f"✓ Column already exists: {col_name}")
         
-        print("\nDraft sessions table structure updated successfully!")
+        print("\n✅ Draft sessions table fixed!")
 
 if __name__ == "__main__":
-    try:
-        fix_draft_sessions_table()
-    except Exception as e:
-        print(f"Error fixing draft sessions table: {e}")
-        sys.exit(1)
+    fix_draft_sessions_table()

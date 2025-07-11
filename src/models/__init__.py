@@ -4,6 +4,7 @@ Database models for Fantasy Football Assistant
 
 from .database import Base, engine, SessionLocal, get_db
 from .user import User
+from .admin_log import AdminActivityLog
 from .player import Player, PlayerStats, Team
 from .fantasy import League, FantasyTeam, Roster, Trade, WaiverClaim
 from .espn_league import (
@@ -30,6 +31,7 @@ __all__ = [
     "SessionLocal",
     "get_db",
     "User",
+    "AdminActivityLog",
     "Player",
     "PlayerStats", 
     "Team",

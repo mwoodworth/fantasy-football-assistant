@@ -18,6 +18,9 @@ import { DraftRoomPage } from './pages/DraftRoomPage';
 import { DraftTest } from './pages/DraftTest';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
+import { AdminDashboard } from './pages/AdminDashboard';
+import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AdminActivityPage } from './pages/AdminActivityPage';
 
 // Components
 import { MainLayout } from './components/layout/MainLayout';
@@ -76,6 +79,9 @@ function App() {
             <Route path="draft-test" element={<DraftTest />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin/users" element={<AdminUsersPage />} />
+            <Route path="admin/activity" element={<AdminActivityPage />} />
           </Route>
         </Routes>
       </Router>
