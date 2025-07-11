@@ -4,7 +4,7 @@ from sqlalchemy import Column, Integer, String, JSON, DateTime, Boolean, Foreign
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from src.core.database import Base
+from .database import Base
 
 class YahooLeague(Base):
     """Yahoo Fantasy League model."""

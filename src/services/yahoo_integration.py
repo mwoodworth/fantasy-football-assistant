@@ -6,11 +6,10 @@ from datetime import datetime, timedelta
 import json
 
 from sqlalchemy.orm import Session
-from src.services.yahoo.oauth_client import YahooOAuthClient
-from src.services.yahoo.fantasy_client import YahooFantasyClient
-from src.models.user import User
-from src.core.database import get_db
-from src.core.cache import cache_manager
+from .yahoo.oauth_client import YahooOAuthClient
+from .yahoo.fantasy_client import YahooFantasyClient
+from ..models.user import User
+from ..models.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +98,6 @@ class YahooIntegrationService:
         
         return client
     
-    @cache_manager.cache(ttl=300)  # Cache for 5 minutes
     def get_user_leagues(self, user_id: int, db: Session) -> List[Dict[str, Any]]:
         """Get all user's Yahoo leagues.
         
