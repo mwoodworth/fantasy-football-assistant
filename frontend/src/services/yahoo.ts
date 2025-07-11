@@ -1,15 +1,79 @@
 import axios from 'axios';
-import type { 
-  YahooAuthStatus, 
-  YahooLeague, 
-  YahooTeam, 
-  YahooPlayer, 
-  YahooTransaction 
-} from '../types/yahoo';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api';
 
-// Yahoo Fantasy API service
+// Yahoo Auth Status type
+export interface YahooAuthStatus {
+  authenticated: boolean;
+  user_id: number;
+}
+
+// Yahoo League type
+export interface YahooLeague {
+  league_key: string;
+  league_id: string;
+  name: string;
+  season: number;
+  num_teams: number;
+  scoring_type: string;
+  draft_status: string;
+  current_week: number;
+  user_team?: YahooTeam;
+  teams?: YahooTeam[];
+}
+
+// Yahoo Team type
+export interface YahooTeam {
+  team_key: string;
+  team_id: number;
+  name: string;
+  manager_name?: string;
+  logo_url?: string;
+  rank?: number;
+  points_for?: number;
+  points_against?: number;
+  wins?: number;
+  losses?: number;
+  ties?: number;
+  is_owned_by_current_login?: boolean;
+}
+
+// Yahoo Player type
+export interface YahooPlayer {
+  player_id: string;
+  name: string;
+  first_name: string;
+  last_name: string;
+  position: string;
+  team: string;
+  bye_week: number;
+  status: string;
+  injury_status?: string;
+  ownership: {
+    percentage_owned: number;
+    change: number;
+  };
+  points: {
+    total: number;
+    average: number;
+  };
+  projections: {
+    season: number;
+    week: number;
+  };
+  source: 'yahoo';
+}
+
+// Yahoo Transaction type
+export interface YahooTransaction {
+  transaction_key: string;
+  type: string;
+  status: string;
+  timestamp: number;
+  players?: YahooPlayer[];
+}
+
+// Yahoo service object
 export const yahooService = {
   // Authentication
   async getAuthUrl(): Promise<{ auth_url: string; state: string }> {
@@ -112,12 +176,3 @@ export const yahooService = {
     return response.data;
   }
 };
-
-// Re-export types from the types file
-export type { 
-  YahooAuthStatus, 
-  YahooLeague, 
-  YahooTeam, 
-  YahooPlayer, 
-  YahooTransaction 
-} from '../types/yahoo';
