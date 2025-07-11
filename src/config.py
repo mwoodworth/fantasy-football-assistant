@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # Development/Testing settings
     use_mock_data: bool = False
     
+    # Monitoring settings
+    draft_monitor_interval: int = 60  # seconds
+    live_monitor_interval: int = 300  # seconds
+    disable_espn_sync_logs: bool = False
+    
     class Config:
         env_file = ".env"
         case_sensitive = False
