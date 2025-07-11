@@ -23,6 +23,16 @@ import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminActivityPage } from './pages/AdminActivityPage';
 import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
+// Settings Pages
+import { SettingsLayout } from './components/settings/SettingsLayout';
+import { 
+  UserProfileSettings,
+  UserPreferencesSettings,
+  UserSecuritySettings,
+  UserConnectedAccounts,
+  UserPrivacySettings
+} from './pages/settings';
+
 // Components
 import { MainLayout } from './components/layout/MainLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -82,6 +92,23 @@ function App() {
             <Route path="draft-test" element={<DraftTest />} />
             <Route path="ai-assistant" element={<AIAssistantPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+          </Route>
+
+          {/* Settings routes */}
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<Navigate to="/settings/profile" replace />} />
+            <Route path="profile" element={<UserProfileSettings />} />
+            <Route path="preferences" element={<UserPreferencesSettings />} />
+            <Route path="security" element={<UserSecuritySettings />} />
+            <Route path="accounts" element={<UserConnectedAccounts />} />
+            <Route path="privacy" element={<UserPrivacySettings />} />
           </Route>
 
           {/* Admin routes with separate layout */}

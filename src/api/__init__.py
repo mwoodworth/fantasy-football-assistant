@@ -14,6 +14,7 @@ from .teams import router as teams_router
 from .yahoo import router as yahoo_router
 from .yahoo_draft import router as yahoo_draft_router
 from .admin import router as admin_router
+from .user_settings import router as user_settings_router
 
 __all__ = [
     "auth_router",
@@ -27,5 +28,6 @@ __all__ = [
     "teams_router",
     "yahoo_router",
     "yahoo_draft_router",
-    "admin_router"
+    "admin_router",
+    "user_settings_router"
 ]

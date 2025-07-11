@@ -11,8 +11,10 @@ import {
   Menu,
   X,
   Shield,
+  Settings,
+  ChevronDown,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '../../utils/cn';
 import { LiveUpdates } from '../LiveUpdates';
 
@@ -21,6 +23,8 @@ export function MainLayout() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Build navigation items based on user role
   const baseNavigation = [
@@ -39,6 +43,18 @@ export function MainLayout() {
     : [];
 
   const navigationItems = [...baseNavigation, ...adminNavigation];
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -105,22 +121,50 @@ export function MainLayout() {
           </nav>
 
           {/* User section */}
-          <div className="border-t p-4">
-            <div className="flex items-center">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {user?.first_name && user?.last_name 
-                    ? `${user.first_name} ${user.last_name}` 
-                    : user?.username}
-                </p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-              </div>
+          <div className="border-t p-4" ref={userMenuRef}>
+            <div className="relative">
               <button
-                onClick={handleLogout}
-                className="ml-3 p-2 text-gray-400 hover:text-gray-500"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center w-full text-left hover:bg-gray-50 rounded-md p-2 transition-colors"
               >
-                <LogOut className="h-5 w-5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.first_name && user?.last_name 
+                      ? `${user.first_name} ${user.last_name}` 
+                      : user?.username}
+                  </p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
+                </div>
+                <ChevronDown className={cn(
+                  'h-4 w-4 text-gray-400 transition-transform',
+                  userMenuOpen && 'rotate-180'
+                )} />
               </button>
+
+              {/* Dropdown menu */}
+              {userMenuOpen && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 py-1">
+                  <Link
+                    to="/settings/profile"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setUserMenuOpen(false)}
+                  >
+                    <Settings className="h-4 w-4 mr-3 text-gray-400" />
+                    Settings
+                  </Link>
+                  <hr className="my-1 border-gray-200" />
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <LogOut className="h-4 w-4 mr-3 text-gray-400" />
+                    Sign out
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
