@@ -16,11 +16,10 @@ import { Button } from '../components/common/Button';
 import { Alert } from '../components/common/Alert';
 import { Badge } from '../components/common/Badge';
 import { yahooService, YahooLeague, YahooAuthStatus } from '../services/yahoo';
-import { useToast } from '../hooks/useToast';
+import { toast } from '../utils/toast';
 
 export const YahooLeaguesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [authStatus, setAuthStatus] = useState<YahooAuthStatus | null>(null);
   const [leagues, setLeagues] = useState<YahooLeague[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,11 +63,7 @@ export const YahooLeaguesPage: React.FC = () => {
       window.location.href = auth_url;
     } catch (err) {
       console.error('Failed to get auth URL:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to start Yahoo authentication',
-        variant: 'destructive',
-      });
+      toast.error('Failed to start Yahoo authentication');
     }
   };
 
@@ -81,17 +76,10 @@ export const YahooLeaguesPage: React.FC = () => {
       await yahooService.disconnect();
       setAuthStatus({ authenticated: false, user_id: authStatus?.user_id || 0 });
       setLeagues([]);
-      toast({
-        title: 'Success',
-        description: 'Yahoo account disconnected',
-      });
+      toast.success('Yahoo account disconnected');
     } catch (err) {
       console.error('Failed to disconnect:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to disconnect Yahoo account',
-        variant: 'destructive',
-      });
+      toast.error('Failed to disconnect Yahoo account');
     }
   };
 
@@ -100,21 +88,14 @@ export const YahooLeaguesPage: React.FC = () => {
     try {
       const result = await yahooService.syncLeague(leagueKey);
       if (result.success) {
-        toast({
-          title: 'Success',
-          description: `Synced ${result.league_name} (${result.teams_synced} teams)`,
-        });
+        toast.success(`Synced ${result.league_name} (${result.teams_synced} teams)`);
         await loadLeagues();
       } else {
         throw new Error(result.error || 'Sync failed');
       }
     } catch (err) {
       console.error('Failed to sync league:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to sync league data',
-        variant: 'destructive',
-      });
+      toast.error('Failed to sync league data');
     } finally {
       setSyncing(null);
     }
