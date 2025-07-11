@@ -21,6 +21,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminActivityPage } from './pages/AdminActivityPage';
+import { AdminSettingsPage } from './pages/AdminSettingsPage';
 
 // Components
 import { MainLayout } from './components/layout/MainLayout';
@@ -82,6 +83,7 @@ function App() {
             <Route path="admin" element={<AdminDashboard />} />
             <Route path="admin/users" element={<AdminUsersPage />} />
             <Route path="admin/activity" element={<AdminActivityPage />} />
+            <Route path="admin/settings" element={<AdminSettingsPage />} />
           </Route>
         </Routes>
       </Router>

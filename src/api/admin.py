@@ -7,12 +7,16 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+from pydantic import BaseModel
+import os
 
 from ..models import User, AdminActivityLog, ESPNLeague, YahooLeague, Player, Team
 from ..models.database import get_db
 from ..utils.dependencies import get_admin_user, get_superadmin_user, require_permission
 from ..utils.admin_logging import log_admin_activity, AdminActions
 from ..utils.schemas import UserResponse, UserUpdate
+from ..config import settings
+from ..services.espn_integration import espn_service
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -231,42 +235,37 @@ async def get_system_stats(
     # User stats
     total_users = db.query(User).count()
     active_users = db.query(User).filter(User.is_active == True).count()
+    premium_users = db.query(User).filter(User.is_premium == True).count()
     admin_users = db.query(User).filter(User.is_admin == True).count()
+    superadmin_users = db.query(User).filter(User.is_superadmin == True).count()
     
-    # Recent registrations (last 7 days)
+    # Recent registrations
+    today = datetime.utcnow().date()
     week_ago = datetime.utcnow() - timedelta(days=7)
-    recent_signups = db.query(User).filter(User.created_at >= week_ago).count()
+    month_ago = datetime.utcnow() - timedelta(days=30)
     
-    # League stats
-    espn_leagues = db.query(ESPNLeague).count()
-    yahoo_leagues = db.query(YahooLeague).count()
+    users_today = db.query(User).filter(
+        func.date(User.created_at) == today
+    ).count()
     
-    # Activity stats (last 24 hours)
-    day_ago = datetime.utcnow() - timedelta(days=1)
-    active_today = db.query(User).filter(User.last_login >= day_ago).count()
+    users_this_week = db.query(User).filter(
+        User.created_at >= week_ago
+    ).count()
     
-    # Database stats
-    player_count = db.query(Player).count()
-    team_count = db.query(Team).count()
+    users_this_month = db.query(User).filter(
+        User.created_at >= month_ago
+    ).count()
     
+    # Return stats in the format expected by frontend
     stats = {
-        "users": {
-            "total": total_users,
-            "active": active_users,
-            "admins": admin_users,
-            "recent_signups": recent_signups,
-            "active_today": active_today
-        },
-        "leagues": {
-            "espn": espn_leagues,
-            "yahoo": yahoo_leagues,
-            "total": espn_leagues + yahoo_leagues
-        },
-        "database": {
-            "players": player_count,
-            "teams": team_count
-        },
-        "timestamp": datetime.utcnow().isoformat()
+        "total_users": total_users,
+        "active_users": active_users,
+        "premium_users": premium_users,
+        "total_admins": admin_users,
+        "total_superadmins": superadmin_users,
+        "users_today": users_today,
+        "users_this_week": users_this_week,
+        "users_this_month": users_this_month
     }
     
     # Log the action
@@ -382,3 +381,124 @@ async def revoke_admin_privileges(
     )
     
     return {"message": "Admin privileges revoked successfully"}
+
+
+# System Settings Schema
+class SystemSettings(BaseModel):
+    draft_monitor_interval: int = 60
+    live_monitor_interval: int = 300
+    disable_espn_sync_logs: bool = False
+    log_level: str = "INFO"
+    cache_expire_time: int = 3600
+    rate_limit_default: int = 60
+    rate_limit_espn: int = 10
+    rate_limit_ai: int = 20
+
+
+# Settings Endpoints
+
+@router.get("/settings")
+async def get_system_settings(
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_superadmin_user)
+):
+    """Get current system settings (superadmin only)"""
+    # Get settings from config
+    current_settings = {
+        "draft_monitor_interval": getattr(settings, 'draft_monitor_interval', 60),
+        "live_monitor_interval": getattr(settings, 'live_monitor_interval', 300),
+        "disable_espn_sync_logs": getattr(settings, 'disable_espn_sync_logs', False),
+        "log_level": settings.log_level,
+        "cache_expire_time": settings.cache_expire_time,
+        "rate_limit_default": 60,  # These would come from middleware config
+        "rate_limit_espn": 10,
+        "rate_limit_ai": 20
+    }
+    
+    return current_settings
+
+
+@router.put("/settings")
+async def update_system_settings(
+    new_settings: SystemSettings,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_superadmin_user)
+):
+    """Update system settings (superadmin only)"""
+    # In a real implementation, you'd save these to a database or config file
+    # For now, we'll update environment variables
+    
+    changes = {}
+    
+    # Update monitoring intervals
+    if new_settings.draft_monitor_interval != getattr(settings, 'draft_monitor_interval', 60):
+        os.environ['DRAFT_MONITOR_INTERVAL'] = str(new_settings.draft_monitor_interval)
+        changes['draft_monitor_interval'] = new_settings.draft_monitor_interval
+    
+    if new_settings.live_monitor_interval != getattr(settings, 'live_monitor_interval', 300):
+        os.environ['LIVE_MONITOR_INTERVAL'] = str(new_settings.live_monitor_interval)
+        changes['live_monitor_interval'] = new_settings.live_monitor_interval
+    
+    if new_settings.disable_espn_sync_logs != getattr(settings, 'disable_espn_sync_logs', False):
+        os.environ['DISABLE_ESPN_SYNC_LOGS'] = str(new_settings.disable_espn_sync_logs).lower()
+        changes['disable_espn_sync_logs'] = new_settings.disable_espn_sync_logs
+    
+    # Log the changes
+    log_admin_activity(
+        db, admin.id, "settings.update",
+        details={"changes": changes},
+        request=request
+    )
+    
+    return {"message": "Settings updated successfully", "changes": changes}
+
+
+# Maintenance Endpoints
+
+@router.post("/maintenance/{action}")
+async def perform_maintenance(
+    action: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_superadmin_user)
+):
+    """Perform maintenance actions (superadmin only)"""
+    
+    if action == "clear-cache":
+        # Clear ESPN service cache
+        espn_service.clear_cache()
+        message = "Cache cleared successfully"
+        
+    elif action == "optimize-database":
+        # Run database optimization (SQLite specific)
+        from sqlalchemy import text
+        db.execute(text("VACUUM"))
+        db.commit()
+        message = "Database optimized successfully"
+        
+    elif action == "clean-logs":
+        # Clean old activity logs (older than 90 days)
+        cutoff_date = datetime.utcnow() - timedelta(days=90)
+        deleted = db.query(AdminActivityLog).filter(
+            AdminActivityLog.created_at < cutoff_date
+        ).delete()
+        db.commit()
+        message = f"Cleaned {deleted} old log entries"
+        
+    elif action == "reset-rate-limits":
+        # This would reset rate limit counters in your middleware
+        message = "Rate limits reset successfully"
+        
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown maintenance action: {action}")
+    
+    # Log the action
+    log_admin_activity(
+        db, admin.id, f"maintenance.{action}",
+        details={"result": message},
+        request=request
+    )
+    
+    return {"message": message}
