@@ -2,21 +2,36 @@
 
 An AI-powered fantasy football assistant that provides intelligent draft strategies, weekly lineup optimization, waiver wire recommendations, and trade analysis using advanced machine learning and natural language processing.
 
-## Project Status: 🚀 Phase 5 Complete - Full-Stack Application Ready
+## Project Status: 🚀 Phase 5.5 Complete - Enhanced User Experience
 
-**Current Version**: Phase 5 - Complete Frontend with React + TypeScript  
-**Status**: Production-ready full-stack application with comprehensive AI features
+**Current Version**: Phase 5.5 - Full-Stack Application with Admin Panel & User Settings  
+**Status**: Production-ready with comprehensive user management and customization features
 
-## 🎉 What's New in Phase 5
+## 🎉 What's New in Phase 5.5
 
-### Frontend Application (Complete)
+### User Settings & Profile Management (NEW!)
+- **Comprehensive Settings Panel**: Full user control over profile, preferences, and privacy
+- **Avatar Upload**: Profile picture management with image processing
+- **Fantasy Preferences**: Favorite team selection, default league size, and scoring preferences
+- **Security Controls**: Password management and session control
+- **Connected Accounts**: ESPN and Yahoo account integration management
+- **Privacy Settings**: Data export, account deletion, and visibility controls
+
+### Admin Panel & User Management (NEW!)
+- **Admin Dashboard**: Real-time system metrics and user activity monitoring
+- **User Management**: Complete CRUD operations for user accounts
+- **Activity Tracking**: Monitor user actions and system usage
+- **Role-Based Access**: Admin and superadmin role management
+- **System Settings**: Configure application-wide settings
+
+### Frontend Application (Enhanced)
 - **Modern React UI**: Built with React 18, TypeScript, and Vite
-- **Beautiful Design**: Tailwind CSS with responsive layouts
+- **Beautiful Design**: Tailwind CSS with responsive layouts and custom components
 - **Real-time Dashboard**: Live scores, trending players, and performance metrics
 - **Team Management**: Complete team interface with settings and roster management
 - **Player Analytics**: Advanced visualizations and player comparison tools
 - **AI Chat Assistant**: Natural language interface for fantasy advice
-- **Authentication**: Secure JWT-based auth with persistent sessions
+- **Authentication**: Secure JWT-based auth with persistent sessions and role management
 
 ## Features
 
@@ -27,6 +42,8 @@ An AI-powered fantasy football assistant that provides intelligent draft strateg
 - **Team Management**: Roster management, lineup optimization, and trade center
 - **Analytics Page**: Interactive charts and performance visualizations
 - **AI Assistant**: Chat interface for natural language fantasy advice
+- **User Settings**: Complete profile, preferences, security, and privacy management
+- **Admin Panel**: System administration with user management and activity monitoring
 - **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
 
 ### 🤖 AI-Powered Intelligence
@@ -82,6 +99,8 @@ An AI-powered fantasy football assistant that provides intelligent draft strateg
 - **AI/ML**: Claude API (Anthropic) + scikit-learn + XGBoost
 - **Authentication**: JWT tokens with Bearer authentication
 - **Services**: Modular AI service architecture
+- **File Storage**: Local storage with Pillow for image processing
+- **Security**: bcrypt for password hashing, role-based access control
 
 ### APIs & Services
 - **ESPN API**: Player statistics and league data
@@ -96,6 +115,7 @@ An AI-powered fantasy football assistant that provides intelligent draft strateg
 - Node.js 18+ and npm
 - PostgreSQL 14+ (or SQLite for development)
 - Anthropic API key (optional, mock responses available)
+- Pillow (PIL) for image processing (installed automatically)
 
 ### Installation
 
@@ -176,6 +196,13 @@ For development, you can register a new account or use:
 - **Email**: test@example.com
 - **Password**: TestPassword123!
 
+### Admin Access
+To access admin features:
+1. Register a new account or login
+2. Use the database to set `is_admin` or `is_superadmin` to `true` for your user
+3. Access admin panel at `/admin`
+4. Access user settings at `/settings`
+
 ## Troubleshooting
 
 ### WebSocket Connection Issues
@@ -220,8 +247,12 @@ fantasy-football-assistant/
 │   │   │   ├── dashboard/    # Dashboard widgets
 │   │   │   ├── players/      # Player-related components
 │   │   │   ├── analytics/    # Charts and visualizations
-│   │   │   └── ai/          # AI chat interface
+│   │   │   ├── ai/          # AI chat interface
+│   │   │   ├── admin/       # Admin panel components
+│   │   │   └── settings/    # User settings components
 │   │   ├── pages/           # Page components
+│   │   │   ├── settings/    # User settings pages
+│   │   │   └── ...         # Other pages
 │   │   ├── services/        # API service layer
 │   │   ├── store/           # Global state management
 │   │   └── utils/           # Utility functions
@@ -230,6 +261,8 @@ fantasy-football-assistant/
 │   │   ├── ai.py           # AI service endpoints
 │   │   ├── auth.py         # Authentication
 │   │   ├── dashboard.py    # Dashboard data endpoints
+│   │   ├── admin.py        # Admin panel endpoints
+│   │   ├── user_settings.py # User settings endpoints
 │   │   └── ...
 │   ├── models/             # Database models
 │   ├── services/           # Business logic
@@ -237,6 +270,8 @@ fantasy-football-assistant/
 │   │   ├── draft_monitor.py  # ESPN draft polling service
 │   │   └── websocket_server.py # Socket.IO server
 │   └── main.py            # FastAPI application
+├── static/                 # Static files
+│   └── avatars/           # User avatar uploads
 ├── scripts/                # Utility scripts
 │   ├── start_with_websockets.py  # WebSocket-enabled startup
 │   ├── check_dependencies.sh     # Dependency checker
@@ -286,6 +321,18 @@ fantasy-football-assistant/
 - ✅ Analytics visualizations
 - ✅ Team settings and management
 - ✅ Dashboard widgets (live scores, trending players, etc.)
+
+### ✅ Phase 5.5: User Experience & Administration (Complete)
+- ✅ Comprehensive user settings panel with multiple sections
+- ✅ Profile management with avatar upload
+- ✅ Fantasy preferences configuration
+- ✅ Security settings with password management
+- ✅ Connected accounts management (ESPN/Yahoo)
+- ✅ Privacy controls with data export
+- ✅ Admin dashboard with system metrics
+- ✅ User management for administrators
+- ✅ Activity tracking and monitoring
+- ✅ Role-based access control (RBAC)
 
 ## Testing & Quality Assurance
 
@@ -344,21 +391,37 @@ fantasy-football-assistant/
 - [ ] Achievement system
 - [ ] Fantasy football tutorials
 
+## Recent Features & Improvements
+
+### User Management & Settings
+- ✅ Complete user settings interface with profile, preferences, security, and privacy sections
+- ✅ Avatar upload with image processing and storage
+- ✅ Password change functionality with secure validation
+- ✅ Session management and security controls
+- ✅ Data export and account deletion options
+- ✅ Connected accounts management for ESPN and Yahoo
+
+### Admin Panel
+- ✅ Real-time dashboard with system metrics
+- ✅ User management with search, filter, and role assignment
+- ✅ Activity tracking and monitoring
+- ✅ System settings configuration
+
 ## Known Issues & Limitations
 
 ### Current Limitations
 - AI features require Anthropic API key (mock responses available)
 - ESPN integration requires manual league ID input
-- Limited to PPR scoring format currently
-- No real-time WebSocket updates yet
-- Mobile responsiveness could be improved
+- Limited to PPR, Standard, and Half-PPR scoring formats
+- WebSocket updates implemented but limited to draft features
+- Mobile responsiveness implemented but could be enhanced
 
 ### Bug Fixes Needed
 - [ ] Improve error handling for API failures
-- [ ] Add loading states for all async operations
+- [ ] Add loading states for remaining async operations
 - [ ] Optimize bundle size for production
-- [ ] Add proper form validation
-- [ ] Implement request rate limiting
+- [ ] Enhanced form validation across all forms
+- [ ] Implement comprehensive request rate limiting
 
 ## Contributing
 
